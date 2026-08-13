@@ -1,19 +1,26 @@
-.PHONY: setup ingest visuals model all clean
+.PHONY: setup refresh ingest train site all test serve
+
+PYTHON := .venv/bin/python
 
 setup:
-	python3 -m venv .venv
-	.venv/bin/pip install -r requirements.txt
+	uv sync --python 3.13
+
+refresh:
+	$(PYTHON) scripts/refresh_data.py
 
 ingest:
-	.venv/bin/python import_ipl_data.py
+	$(PYTHON) scripts/build_database.py
 
-visuals:
-	.venv/bin/python ipl_visuals.py
+train: ingest
+	OPENBLAS_NUM_THREADS=2 OMP_NUM_THREADS=2 VECLIB_MAXIMUM_THREADS=2 $(PYTHON) scripts/train_models.py
 
-model:
-	.venv/bin/python ipl_modeling.py
+site: train
+	$(PYTHON) scripts/build_site_data.py
 
-all: ingest visuals model
+all: site
 
-clean:
-	rm -rf .venv __pycache__ *.pyc
+test:
+	$(PYTHON) -m unittest discover -s tests -v
+
+serve:
+	$(PYTHON) -m http.server 8000
