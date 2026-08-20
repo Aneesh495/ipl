@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import defaultdict
 import json
 from pathlib import Path
-import shutil
 import sqlite3
 
 import numpy as np
 
-from build_database import DB_PATH, ROOT, canonical_team
+from build_database import DB_PATH, ROOT
 
 
 SITE = ROOT / "docs"
@@ -31,7 +30,9 @@ def build():
     matches = [dict(row) for row in con.execute("SELECT * FROM matches ORDER BY match_date DESC,match_id DESC")]
     match_lookup = {m["match_id"]: m for m in matches}
     write_json(DATA / "manifest.json", manifest)
-    write_json(DATA / "report.json", report)
+    public_report = dict(report)
+    public_report.pop("runtime_seconds", None)
+    write_json(DATA / "report.json", public_report)
     write_json(DATA / "matches.json", [
         {"id": m["match_id"], "date": m["match_date"], "season": m["season"],
          "team1": m["team1_franchise"], "team2": m["team2_franchise"],
@@ -78,14 +79,14 @@ def build():
         s["deliveries"] += 1
         s["runs"] += row["total_runs"]
         s["legal_balls"] += row["legal"]
-        s["fours"] += row["batter_runs"] == 4
-        s["sixes"] += row["batter_runs"] == 6
+        s["fours"] += row["legal"] and row["batter_runs"] == 4
+        s["sixes"] += row["legal"] and row["batter_runs"] == 6
         s["wickets"] += row["wicket_count"]
         stage = "Powerplay" if row["over_no"] < 6 else "Middle" if row["over_no"] < 15 else "Death"
         p = phase[(y, stage)]
         p["runs"] += row["total_runs"]
         p["legal_balls"] += row["legal"]
-        p["boundaries"] += row["batter_runs"] in (4, 6)
+        p["boundaries"] += row["legal"] and row["batter_runs"] in (4, 6)
         p["wickets"] += row["wicket_count"]
         p["deliveries"] += 1
         batter_id = row["batter_id"] or row["batter"]
@@ -94,7 +95,8 @@ def build():
         names[bowler_id] = row["bowler"]
         b = batters[batter_id]
         b["runs"] += row["batter_runs"]
-        b["balls"] += row["legal"]
+        # A no-ball counts as faced by the batter; a wide does not.
+        b["balls"] += row["wides"] == 0
         b["fours"] += row["batter_runs"] == 4
         b["sixes"] += row["batter_runs"] == 6
         b["matches"].add(row["match_id"])
@@ -179,7 +181,6 @@ def build():
                                  probabilities["probability"], probabilities["boosted_probability"])
     }
     replays = defaultdict(dict)
-    swings = []
     query = """
       SELECT d.match_id,d.delivery_no,d.over_no,d.actual_delivery,d.batter,d.bowler,
              d.total_runs,d.wicket_count,d.wicket_kinds,d.legal
@@ -190,16 +191,15 @@ def build():
     current_id = None
     runs = wickets = legal_balls = 0
     trace = []
-    previous = None
     for row in con.execute(query):
         mid = row["match_id"]
         if mid != current_id:
             if current_id is not None:
+                trace[-1][4] = trace[-1][5] = int(bool(match_lookup[current_id]["chase_won"]))
                 replays[str(match_lookup[current_id]["season"])][str(current_id)] = trace
             current_id = mid
             runs = wickets = legal_balls = 0
             trace = []
-            previous = None
         m = match_lookup[mid]
         runs += row["total_runs"]
         wickets += row["wicket_count"]
@@ -210,22 +210,11 @@ def build():
         point = [row["delivery_no"], legal_balls, runs, wickets, p, q,
                  row["batter"], row["bowler"], row["total_runs"], row["wicket_kinds"] or ""]
         trace.append(point)
-        if previous is not None:
-            swing = round(p - previous, 4)
-            if abs(swing) >= 0.1:
-                swings.append({"match_id": mid, "season": m["season"], "date": m["match_date"],
-                               "batting": m["chase_team_franchise"], "bowling":
-                               m["team2_franchise"] if m["chase_team_franchise"] == m["team1_franchise"] else m["team1_franchise"],
-                               "ball": row["actual_delivery"] or str(row["over_no"] + 1),
-                               "batter": row["batter"], "bowler": row["bowler"],
-                               "runs": row["total_runs"], "wicket": row["wicket_kinds"] or "",
-                               "swing": swing, "before": round(previous, 4), "after": p})
-        previous = p
     if current_id is not None:
+        trace[-1][4] = trace[-1][5] = int(bool(match_lookup[current_id]["chase_won"]))
         replays[str(match_lookup[current_id]["season"])][str(current_id)] = trace
     for year, rows in replays.items():
         write_json(DATA / "replays" / f"{year}.json", rows)
-    write_json(DATA / "swings.json", sorted(swings, key=lambda x: -abs(x["swing"]))[:120])
     con.close()
     return {"matches": len(matches), "replay_matches": sum(map(len, replays.values())),
             "batter_profiles": len(batter_rows), "bowler_profiles": len(bowler_rows),

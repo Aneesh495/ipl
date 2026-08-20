@@ -38,3 +38,10 @@ An interactive, local-first cricket data lab with four linked views:
 - 2025 and 2026 holdout evaluation is reported honestly, including any failure to beat the baseline.
 - The web app can select 2026 matches, render at least four distinct interactive analyses, explain model scope, and show Cricsheet attribution.
 - Main branch is pushed only after tests and artifact verification.
+
+## Implementation decisions after modeling
+
+- 1,195 standard chases are eligible. The final state is a known result, including six innings that ended with an absent batter at nine recorded wickets, so no final state enters model training.
+- The boosted model won the 2024 raw validation comparison but lost to calibrated logistic in 2025–26. The app uses logistic as its main replay line. Because this choice followed inspection of later scores, those scores are diagnostic rather than an untouched final estimate.
+- Career batting balls include no-balls and exclude wides. Scoring trends count boundaries on legal balls only. Bowler conceded runs exclude byes and leg-byes.
+- The published app has seven interactive charts and season-sharded replay data. Automated verification covers data and chart configuration; browser visual inspection was blocked by a saved browser permission setting in this workspace.

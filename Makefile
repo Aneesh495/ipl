@@ -21,6 +21,7 @@ all: site
 
 test:
 	$(PYTHON) -m unittest discover -s tests -v
+	node tests/site_smoke.cjs
 
 serve:
 	$(PYTHON) -m http.server 8000

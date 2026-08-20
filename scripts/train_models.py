@@ -57,6 +57,7 @@ def load_features(database: Path = DB_PATH):
     """
     chase_x, chase_y, chase_meta = [], [], []
     ball_x, ball_runs, ball_wicket, ball_meta = [], [], [], []
+    last_chase_delivery = {}
     current = None
     runs = wickets = legal_used = 0
     recent = deque(maxlen=12)
@@ -79,11 +80,20 @@ def load_features(database: Path = DB_PATH):
         wickets += wicket_count
         legal_used += legal
         recent.append((total_runs, wicket_count))
+        if innings_no == 2:
+            last_chase_delivery[match_id] = delivery_no
         if innings_no == 2 and target - runs > 0 and legal_used < total_balls and wickets < 10:
             chase_x.append(state_features(innings_no, target, runs, wickets, legal_used, total_balls, recent))
             chase_y.append(chase_won)
             chase_meta.append((match_id, season, delivery_no))
     con.close()
+    # A few innings end with nine recorded wickets because another batter is absent.
+    # The last recorded delivery ends those matches even though numeric state limits do not.
+    keep = [i for i, (mid, _, delivery_no) in enumerate(chase_meta)
+            if delivery_no != last_chase_delivery[mid]]
+    chase_x = [chase_x[i] for i in keep]
+    chase_y = [chase_y[i] for i in keep]
+    chase_meta = [chase_meta[i] for i in keep]
     return (
         np.asarray(chase_x, dtype=np.float32), np.asarray(chase_y, dtype=np.int8), chase_meta,
         np.asarray(ball_x, dtype=np.float32), np.asarray(ball_runs, dtype=np.float32),

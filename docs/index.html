@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111d">
+  <meta name="description" content="Explore every IPL season, ball by ball, with honest machine learning and interactive match replays.">
+  <title>IPL Decision Lab | Every ball changes the game</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./vendor/echarts.min.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="site-shell">
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="IPL Decision Lab home"><span class="brand-mark">◉</span><span>IPL <b>Decision Lab</b></span></a>
+      <nav aria-label="Main navigation">
+        <a href="#lab">Match lab</a><a href="#atlas">Era atlas</a><a href="#players">Players</a><a href="#audit">Model audit</a>
+      </nav>
+      <span class="topbar-tag">2008 <span>→</span> 2026</span>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="live-dot"></span> THE ENTIRE IPL, UNDER THE MICROSCOPE</div>
+          <h1>Every ball<br><em>changes the game.</em></h1>
+          <p>One league. Nineteen seasons. Nearly 300,000 deliveries. Trace the moments that moved a chase, map how T20 evolved, and see where machine learning gets it right or wrong.</p>
+          <div class="hero-actions"><a class="button primary" href="#lab">Explore a match <span>↗</span></a><a class="button ghost" href="#audit">Inspect the model <span>↗</span></a></div>
+        </div>
+        <div class="hero-graphic" aria-hidden="true">
+          <div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="orbit orbit-c"></div>
+          <div class="ball-core"><span class="seam seam-a"></span><span class="seam seam-b"></span></div>
+          <span class="orbit-label top">01 / DECISION</span><span class="orbit-label bottom">∞ / POSSIBILITY</span>
+        </div>
+      </section>
+
+      <section class="metric-strip" aria-label="Dataset at a glance">
+        <div class="metric"><span class="metric-label">Matches recorded</span><strong id="metricMatches">—</strong><small>Cricsheet IPL archive</small></div>
+        <div class="metric"><span class="metric-label">Deliveries studied</span><strong id="metricBalls">—</strong><small>Every recorded ball</small></div>
+        <div class="metric"><span class="metric-label">Match replays</span><strong id="metricReplays">—</strong><small>Standard chases</small></div>
+        <div class="metric"><span class="metric-label">Model Brier score</span><strong id="metricBrier">—</strong><small>Lower is better · 2025–26</small></div>
+      </section>
+
+      <section id="lab" class="section">
+        <div class="section-head"><div><span class="section-no">01 / MATCH LAB</span><h2>Replay the pressure.</h2><p>Follow a chase ball by ball. Two models track its changing win probability. Select a delivery to inspect the state behind the line.</p></div><span class="section-ornament">↗</span></div>
+        <div class="filter-bar">
+          <label>Season<select id="seasonSelect" aria-label="Select season"></select></label>
+          <label>Team<select id="teamSelect" aria-label="Filter by team"><option value="all">All teams</option></select></label>
+          <label class="match-filter">Match<select id="matchSelect" aria-label="Select match"></select></label>
+          <button id="playButton" class="button small" type="button" aria-label="Play match replay">▶ &nbsp;Play replay</button>
+        </div>
+        <div class="match-header card">
+          <div><span class="card-kicker" id="matchDate">MATCH REPLAY</span><h3 id="matchTitle">Loading match...</h3><p id="matchSub">&nbsp;</p></div>
+          <div class="match-result"><span>CHASE RESULT</span><strong id="matchResult">—</strong><small id="matchTarget">—</small></div>
+        </div>
+        <div class="lab-grid">
+          <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">WIN PROBABILITY</span><h3>How the chase moved</h3></div><div class="legend"><span><i class="legend-teal"></i> Calibrated logistic</span><span><i class="legend-gold"></i> Boosted model</span></div></div><div id="replayChart" class="chart replay-chart" role="img" aria-label="Ball by ball win probability chart"></div><div class="chart-caption">After each delivery; final point is the known result · replay model chosen after 2025–26 evaluation · historical training games are in sample</div></div>
+          <aside class="card moment-card"><span class="card-kicker">AT THIS BALL</span><div class="moment-over" id="momentOver">—</div><div class="moment-score" id="momentScore">—</div><p id="momentEvent">Select a point on the replay.</p><div class="moment-prob"><span>Chase win probability</span><strong id="momentProbability">—</strong></div><div class="moment-bar"><div id="momentBarFill"></div></div><div class="moment-shift"><span>Change on this delivery</span><strong id="momentSwing">—</strong></div><input id="ballSlider" type="range" min="0" max="0" value="0" aria-label="Select delivery"><div class="moment-foot">Slide through the innings or click the chart.</div></aside>
+        </div>
+        <div class="card turning-card"><div class="card-top"><div><span class="card-kicker">INFLECTION POINTS</span><h3>Biggest observed swings</h3></div><span class="muted">Probability change between consecutive recorded deliveries</span></div><div id="turningPoints" class="turning-list"></div></div>
+      </section>
+
+      <section id="atlas" class="section">
+        <div class="section-head"><div><span class="section-no">02 / ERA ATLAS</span><h2>The game rewrote itself.</h2><p>Explore scoring inflation, phase shifts, and changing team fortunes across nineteen IPL seasons.</p></div><span class="section-ornament">↗</span></div>
+        <div class="atlas-grid">
+          <div class="card chart-card wide"><div class="card-top"><div><span class="card-kicker">2008–2026</span><h3>Scoring velocity</h3></div></div><div id="eraChart" class="chart atlas-chart" role="img" aria-label="Season scoring trend chart"></div><div class="chart-caption">Runs per six legal balls. Runs on wides and no-balls remain in the numerator.</div></div>
+          <div class="card insight-card"><span class="card-kicker">LONG VIEW</span><div class="insight-value" id="eraChange">—</div><h3>Scoring changed.</h3><p id="eraNarrative">Loading...</p><div class="insight-rule"></div><span class="microcopy">2008 versus 2026 · league wide</span></div>
+          <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">PHASES OF PLAY</span><h3>The over map</h3></div><label class="inline-select">Show<select id="phaseMetric"><option value="run_rate">Run rate</option><option value="boundary_pct">Boundary %</option><option value="wicket_pct">Wicket %</option></select></label></div><div id="phaseChart" class="chart heat-chart" role="img" aria-label="Season by innings phase heatmap"></div></div>
+          <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">FRANCHISE HISTORY</span><h3>Win rate by season</h3></div><span class="muted">Seasons played only</span></div><div id="teamChart" class="chart heat-chart" role="img" aria-label="Team win rate heatmap"></div></div>
+        </div>
+      </section>
+
+      <section id="players" class="section">
+        <div class="section-head"><div><span class="section-no">03 / PLAYER LANDSCAPE</span><h2>Find the outliers.</h2><p>Career production and recent context-adjusted performance. The run model controls for match state, then shrinks small samples toward zero.</p></div><span class="section-ornament">↗</span></div>
+        <div class="filter-bar"><div class="segmented" role="group" aria-label="Player type"><button id="battersTab" class="active" type="button">Batters</button><button id="bowlersTab" type="button">Bowlers</button></div><label>Minimum legal balls<select id="minBalls"><option value="100">100</option><option value="300" selected>300</option><option value="600">600</option><option value="1000">1,000</option></select></label><span class="filter-note">Dot size = career volume · color = most recent season</span></div>
+        <div class="player-grid"><div class="card chart-card"><div class="card-top"><div><span class="card-kicker" id="playerKicker">BATTING FINGERPRINTS</span><h3 id="playerTitle">Power meets volume</h3></div></div><div id="playerChart" class="chart player-chart" role="img" aria-label="Player performance scatter chart"></div><div class="chart-caption" id="playerCaption">Each dot is one player with the selected minimum of legal balls.</div></div><div class="card leaderboard-card"><span class="card-kicker">2025–26 MODEL RESIDUALS</span><h3 id="leaderboardTitle">Context lift</h3><p class="muted" id="leaderboardDescription">Observed batter runs above the next-ball model expectation per 100 legal balls, shrunk toward zero.</p><div id="leaderboard"></div><div class="caution">Association, not causal player value. Bowlers, venues, matchups, and selection still matter.</div></div></div>
+      </section>
+
+      <section id="audit" class="section audit-section">
+        <div class="section-head"><div><span class="section-no">04 / MODEL AUDIT</span><h2>Show the misses.</h2><p>Train on 2008–23, calibrate on 2024, and examine 2025–26. The boosted chase model wins on validation but loses across the later seasons.</p></div><span class="section-ornament">↗</span></div>
+        <div class="audit-banner"><div><span class="banner-icon">!</span></div><p><strong>Read the score honestly.</strong> The replay model was chosen after inspecting aggregate 2025–26 results. Its reported score is diagnostic, not a pristine prospective test. No model has access to the next delivery or final score when it makes a state prediction.</p></div>
+        <div class="audit-grid">
+          <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">CALIBRATION</span><h3>Prediction versus reality</h3></div></div><div id="reliabilityChart" class="chart audit-chart" role="img" aria-label="Reliability plot"></div><div class="chart-caption">Each point groups held-period chase states by forecast probability.</div></div>
+          <div class="card model-card"><span class="card-kicker">2025–26 DIAGNOSTIC PERIOD</span><h3>Simple won.</h3><div id="modelScoreboard"></div><div class="model-note">Brier score measures squared probability error. Lower is better. Each delivery state is scored; match-weighted Brier is in the research notes.</div></div>
+          <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">TREE MODEL</span><h3>What it paid attention to</h3></div></div><div id="importanceChart" class="chart audit-chart" role="img" aria-label="Permutation importance chart"></div><div class="chart-caption">Increase in 2024 validation Brier when one feature is shuffled. This explains the boosted model, not the logistic replay model.</div></div>
+          <div class="card model-card"><span class="card-kicker">SECOND MODEL · NEXT BALL</span><h3>Runs &amp; wicket risk.</h3><div id="nextBallScoreboard"></div><p class="model-note">The run regressor beats a constant mean on squared error, but loses on absolute error. The wicket classifier narrowly beats a constant-rate baseline. Use player residuals as exploration, not scouting verdicts.</p></div>
+        </div>
+      </section>
+    </main>
+    <footer><div><span class="brand-mark">◉</span><strong>IPL Decision Lab</strong><p>Built from the official <a href="https://cricsheet.org/downloads/" target="_blank" rel="noopener noreferrer">Cricsheet IPL JSON archive</a>. Match data and derived charts credit Cricsheet and its contributors.</p></div><div class="footer-links"><a href="https://github.com/Aneesh495/ipl" target="_blank" rel="noopener noreferrer">Source code ↗</a><a href="./PROJECT_PLAN.md">Research plan ↗</a><a href="https://cricsheet.org/format/json/" target="_blank" rel="noopener noreferrer">Data format ↗</a></div></footer>
+  </div>
+  <div id="errorBanner" class="error-banner" hidden></div>
+</body>
+</html>
