@@ -2,6 +2,8 @@
 
 An interactive, ball-by-ball IPL research lab. The checked-in [Cricsheet](https://cricsheet.org/downloads/) snapshot covers **1,243 matches and 295,732 recorded deliveries from 2008 through 2026**. The app replays 1,195 standard chases and exposes its model errors alongside the cricket.
 
+**[Open the live IPL Decision Lab](https://aneesh495.github.io/ipl/)**
+
 ## Explore
 
 - **Match lab:** Browse every standard chase, watch two win-probability models respond after each delivery, and inspect the biggest swings.
