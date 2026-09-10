@@ -13,14 +13,14 @@ An interactive, local-first cricket data lab with four linked views:
 
 1. **Match replay:** every eligible chase has an after-ball win-probability trace, score, wickets, and turning points. Filter all seasons, teams, and matches.
 2. **Era atlas:** scoring and boundary rates by year and innings phase; distinguish recorded deliveries from legal balls.
-3. **Player landscape:** minimum-sample-aware batter and bowler profiles, role clusters, and era trends, keyed by Cricsheet person IDs.
+3. **Player landscape:** minimum-sample-aware batter and bowler profiles, contextual run residuals, and era trends, keyed by Cricsheet person IDs.
 4. **Model audit:** held-out season metrics, reliability, baseline comparison, and slices by chase stage. Numbers are generated from the actual training run.
 
 ## Data and modeling
 
 1. Stream one match at a time into a normalized SQLite database. Keep exact raw strings, person IDs, legal-delivery flags, extras, wicket kind, and source file ID. This bounds import memory and makes every metric reproducible.
 2. Build a **post-delivery chase state** table. Features may use only information available at that point: target, runs and wickets, legal balls left, recent scoring, and the current state. Exclude D/L, no-result/tie, super-over, and invalid-target games from the primary model. Keep all raw matches in descriptive analysis.
-3. Train a regularized logistic baseline and a gradient-boosted tree model. Train on 2008-2023; use 2024 for hyperparameter choice and calibration; reserve 2025 and 2026 as untouched tests. Split by whole match and time. Publish Brier score, log loss, AUC, calibration bins, and per-season results. Add match-level bootstrap intervals if runtime permits.
+3. Train a regularized logistic baseline and a gradient-boosted tree model. Train on 2008-2023; use 2024 for hyperparameter choice and calibration; reserve 2025 and 2026 for later evaluation. Split by whole match and time. Publish Brier score, log loss, AUC, calibration bins, and per-season results. Add match-level bootstrap intervals if runtime permits.
 4. Build a second model for **next-ball runs and dismissal risk** from pre-delivery context. It supports expected-vs-observed player profiles, with shrinkage for small samples. Label all rankings as descriptive associations, never causal estimates.
 5. Export compact, static JSON for the visual app. Keep train artifacts and the SQLite database outside Git; commit reproducible code and the small data products needed for the app.
 
@@ -44,4 +44,4 @@ An interactive, local-first cricket data lab with four linked views:
 - 1,195 standard chases are eligible. The final state is a known result, including six innings that ended with an absent batter at nine recorded wickets, so no final state enters model training.
 - The boosted model won the 2024 raw validation comparison but lost to calibrated logistic in 2025–26. The app uses logistic as its main replay line. Because this choice followed inspection of later scores, those scores are diagnostic rather than an untouched final estimate.
 - Career batting balls include no-balls and exclude wides. Scoring trends count boundaries on legal balls only. Bowler conceded runs exclude byes and leg-byes.
-- The published app has seven interactive charts and season-sharded replay data. Automated verification covers data and chart configuration; browser visual inspection was blocked by a saved browser permission setting in this workspace.
+- The published app has eight interactive charts, including a browser-side next-ball scenario map, and season-sharded replay data. Automated verification covers data, chart configuration, and scenario math against Python reference predictions; browser visual inspection was blocked by a saved browser permission setting in this workspace.

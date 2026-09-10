@@ -7,9 +7,11 @@ import json
 from pathlib import Path
 import sqlite3
 
+import joblib
 import numpy as np
 
 from build_database import DB_PATH, ROOT
+from train_models import state_features
 
 
 SITE = ROOT / "docs"
@@ -33,11 +35,36 @@ def build():
     public_report = dict(report)
     public_report.pop("runtime_seconds", None)
     write_json(DATA / "report.json", public_report)
+    chase_artifact = joblib.load(ROOT / "build" / "chase_model.joblib")
+    baseline = chase_artifact["baseline"]
+    scaler = baseline.named_steps["standardscaler"]
+    classifier = baseline.named_steps["logisticregression"]
+    calibrator = chase_artifact["baseline_calibrator"]
+    reference_states = np.asarray([
+        state_features(2, 180, 72, 2, 60, 120, [(1, 0)] * 12),
+        state_features(2, 180, 156, 6, 108, 120, [(2, 0)] * 12),
+        state_features(2, 190, 22, 1, 18, 120, [(0, 0)] * 12),
+    ], dtype=np.float32)
+    reference_probabilities = calibrator.predict(
+        baseline.predict_proba(reference_states)[:, 1])
+    scenario_model = {
+        "features": chase_artifact["features"],
+        "mean": scaler.mean_.tolist(),
+        "scale": scaler.scale_.tolist(),
+        "coefficients": classifier.coef_[0].tolist(),
+        "intercept": float(classifier.intercept_[0]),
+        "thresholds": calibrator.X_thresholds_.tolist(),
+        "calibrated_values": calibrator.y_thresholds_.tolist(),
+        "references": [
+            {"features": row.tolist(), "probability": float(probability)}
+            for row, probability in zip(reference_states, reference_probabilities)
+        ],
+    }
     write_json(DATA / "matches.json", [
         {"id": m["match_id"], "date": m["match_date"], "season": m["season"],
          "team1": m["team1_franchise"], "team2": m["team2_franchise"],
          "batting": m["chase_team_franchise"], "winner": m["winner_franchise"],
-         "target": m["target"], "chase_runs": m["second_total"],
+         "target": m["target"], "overs": m["target_overs"], "chase_runs": m["second_total"],
          "venue": m["venue"], "stage": m["stage"], "eligible": bool(m["eligible_chase"]),
          "exclusion": m["exclusion_reason"]}
         for m in matches
@@ -215,6 +242,30 @@ def build():
         replays[str(match_lookup[current_id]["season"])][str(current_id)] = trace
     for year, rows in replays.items():
         write_json(DATA / "replays" / f"{year}.json", rows)
+    scenario_references = []
+    for match_id, selected_index, next_runs, next_wicket in [
+        (1535465, 50, 4, 0),
+        (1535465, 50, 0, 1),
+        (1527686, 25, 2, 0),
+    ]:
+        match = match_lookup[match_id]
+        points = replays[str(match["season"])][str(match_id)]
+        current = points[selected_index]
+        recent = [
+            (points[i][8], points[i][3] - (points[i - 1][3] if i else 0))
+            for i in range(max(0, selected_index - 10), selected_index + 1)
+        ] + [(next_runs, next_wicket)]
+        features = np.asarray([state_features(
+            2, match["target"], current[2] + next_runs, current[3] + next_wicket,
+            current[1] + 1, match["target_overs"] * 6, recent,
+        )], dtype=np.float32)
+        probability = float(calibrator.predict(baseline.predict_proba(features)[:, 1])[0])
+        scenario_references.append({
+            "match_id": match_id, "season": match["season"], "selected_index": selected_index,
+            "next_runs": next_runs, "next_wicket": next_wicket, "probability": probability,
+        })
+    scenario_model["scenario_references"] = scenario_references
+    write_json(DATA / "scenario_model.json", scenario_model)
     con.close()
     return {"matches": len(matches), "replay_matches": sum(map(len, replays.values())),
             "batter_profiles": len(batter_rows), "bowler_profiles": len(bowler_rows),

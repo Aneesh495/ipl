@@ -59,6 +59,20 @@
           <aside class="card moment-card"><span class="card-kicker">AT THIS BALL</span><div class="moment-over" id="momentOver">—</div><div class="moment-score" id="momentScore">—</div><p id="momentEvent">Select a point on the replay.</p><div class="moment-prob"><span>Chase win probability</span><strong id="momentProbability">—</strong></div><div class="moment-bar"><div id="momentBarFill"></div></div><div class="moment-shift"><span>Change on this delivery</span><strong id="momentSwing">—</strong></div><input id="ballSlider" type="range" min="0" max="0" value="0" aria-label="Select delivery"><div class="moment-foot">Slide through the innings or click the chart.</div></aside>
         </div>
         <div class="card turning-card"><div class="card-top"><div><span class="card-kicker">INFLECTION POINTS</span><h3>Biggest observed swings</h3></div><span class="muted">Probability change between consecutive recorded deliveries</span></div><div id="turningPoints" class="turning-list"></div></div>
+        <div class="card scenario-card">
+          <div class="card-top"><div><span class="card-kicker">NEXT BALL LAB / LIVE MODEL</span><h3>What if the next ball goes differently?</h3></div><span class="muted">Click any square to inspect the forecast</span></div>
+          <p class="scenario-intro">From the selected moment above, simulate one legal delivery. Each square recomputes the calibrated logistic model with a different run and wicket outcome.</p>
+          <div class="scenario-layout">
+            <div id="scenarioChart" class="chart scenario-chart" role="img" aria-label="Next-ball win probability scenario heatmap"></div>
+            <div class="scenario-readout">
+              <div><span>Current forecast</span><strong id="scenarioCurrent">—</strong></div>
+              <div><span id="scenarioChoice">Next ball</span><strong id="scenarioProjected">—</strong></div>
+              <div><span>Change in win chance</span><strong id="scenarioDelta">—</strong></div>
+              <p id="scenarioNote">Select a nonfinal delivery in the replay.</p>
+            </div>
+          </div>
+          <div class="chart-caption">Conditional scenarios, not a forecast of which outcome will occur. Assumes one legal delivery, with the chosen runs credited to the batting team. No player or matchup effects are modeled.</div>
+        </div>
       </section>
 
       <section id="atlas" class="section">

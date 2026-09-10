@@ -26,7 +26,9 @@ const document = { getElementById(id) {
   return elements.get(id);
 } };
 const echarts = {
-  init() { return { option: null, setOption(option) { this.option = option; }, off() {}, on() {}, clear() { this.option = null; }, dispatchAction() {}, resize() {} }; },
+  init() { return { option: null, events: {}, setOption(option) { this.option = option; },
+    off(name) { delete this.events[name]; }, on(name, handler) { this.events[name] = handler; },
+    clear() { this.option = null; }, dispatchAction() {}, resize() {} }; },
   graphic: { LinearGradient: class { constructor(...args) { this.args = args; } } },
 };
 const context = {
@@ -46,19 +48,37 @@ for (const match of source.matchAll(/\$\("([^"]+)"\)/g)) {
   assert.ok(htmlIds.has(match[1]), `Missing HTML element: ${match[1]}`);
 }
 assert.ok(fs.statSync(path.join(root, 'vendor', 'echarts.min.js')).size > 100000);
-vm.runInContext(source + '\nglobalThis.testApi = { state, loadMatch, setPlayerType, renderPhase };', context);
+vm.runInContext(source + '\nglobalThis.testApi = { state, loadMatch, setPlayerType, renderPhase, calibratedProbability, nextBallProbability, selectMoment };', context);
 
 (async () => {
   for (let i = 0; i < 50 && !context.testApi.state.report; i++) await new Promise(resolve => setTimeout(resolve, 10));
-  const { state, loadMatch, setPlayerType, renderPhase } = context.testApi;
+  const { state, loadMatch, setPlayerType, renderPhase, calibratedProbability, nextBallProbability, selectMoment } = context.testApi;
   assert.equal(state.manifest.matches, 1243);
   assert.equal(state.matches.length, 1243);
   assert.equal(state.match.season, 2026);
   assert.ok(state.trace.length > 100);
   assert.match(document.getElementById('matchTitle').textContent, /vs/);
   assert.equal(document.getElementById('errorBanner').hidden, true);
-  for (const id of ['replayChart', 'eraChart', 'phaseChart', 'teamChart', 'playerChart', 'reliabilityChart', 'importanceChart']) {
+  for (const id of ['replayChart', 'scenarioChart', 'eraChart', 'phaseChart', 'teamChart', 'playerChart', 'reliabilityChart', 'importanceChart']) {
     assert.ok(state.charts[id]?.option?.series?.length, `${id} has a series`);
+  }
+  assert.equal(state.charts.scenarioChart.option.series[0].data.length, 12);
+  for (const reference of state.scenarioModel.references) {
+    assert.ok(Math.abs(calibratedProbability(reference.features) - reference.probability) < 1e-6);
+  }
+  assert.ok(nextBallProbability(4, 0) >= 0 && nextBallProbability(4, 0) <= 1);
+  const firstCell = state.charts.scenarioChart.option.series[0].data[0];
+  state.charts.scenarioChart.events.click({ data: firstCell });
+  assert.equal(state.scenarioChoice.join(','), '0,0');
+  assert.match(document.getElementById('scenarioChoice').textContent, /0 runs/);
+  selectMoment(state.trace.length - 1);
+  assert.equal(state.charts.scenarioChart.option, null);
+  selectMoment(0);
+  for (const reference of state.scenarioModel.scenario_references) {
+    await loadMatch(reference.match_id);
+    selectMoment(reference.selected_index);
+    const actual = nextBallProbability(reference.next_runs, reference.next_wicket);
+    assert.ok(Math.abs(actual - reference.probability) < 1e-6, `Scenario mismatch for ${reference.match_id}`);
   }
   assert.ok(state.charts.replayChart.option.tooltip.formatter([
     { seriesName: 'Calibrated logistic', data: state.charts.replayChart.option.series[0].data[0] }
@@ -73,5 +93,5 @@ vm.runInContext(source + '\nglobalThis.testApi = { state, loadMatch, setPlayerTy
   renderPhase();
   assert.ok(state.charts.phaseChart.option.series[0].data.length >= 50);
   assert.ok(document.getElementById('modelScoreboard').innerHTML.includes('0.1254'));
-  console.log('Static app smoke: 7 charts, 2026 and 2008 replays, player toggle, phase metric, model audit passed.');
+  console.log('Static app smoke: 8 charts, 2026 and 2008 replays, checked scenario math, player toggle, phase metric, model audit passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

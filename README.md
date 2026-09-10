@@ -7,6 +7,7 @@ An interactive, ball-by-ball IPL research lab. The checked-in [Cricsheet](https:
 ## Explore
 
 - **Match lab:** Browse every standard chase, watch two win-probability models respond after each delivery, and inspect the biggest swings.
+- **Next-ball lab:** Click a run-and-wicket outcome to recompute the calibrated chase forecast from any nonfinal replay point.
 - **Era atlas:** Compare scoring, boundaries, wickets, first-innings totals, phases, and franchise win rates across 19 seasons.
 - **Player landscape:** Explore career batting and bowling profiles. Recent run residuals compare 2025–26 observed outcomes with a next-ball model, with small-sample shrinkage.
 - **Model audit:** Inspect calibration, Brier scores, temporal evaluation, feature importance, and where the more flexible model fails.
@@ -45,9 +46,9 @@ Cricsheet JSON (1,243 files, data version 1.2.0)
   → SQLite matches + deliveries
   → 137,488 nonterminal chase states + 275,857 legal-ball examples
   → temporal training, calibration, and model audit
-  → compact static JSON, 19 replay shards, and seven interactive charts
+  → compact static JSON, 19 replay shards, and eight interactive charts
 ~~~
 
-uv.lock pins the Python environment. The build uses a single process and caps numerical-library threads at two. On the development laptop, /usr/bin/time -l make all reported **467,206,144 bytes peak resident memory**, about **446 MiB**. SQLite and trained joblib models live in ignored build/; the published docs/data/ payload is about 8.5 MB total and loads replays one season at a time.
+uv.lock pins the Python environment. The build uses a single process and caps numerical-library threads at two. On the development laptop, /usr/bin/time -l make all reported **477,233,152 bytes peak resident memory**, about **455 MiB**. SQLite and trained joblib models live in ignored build/; the published docs/data/ payload is about 8.5 MB total and loads replays one season at a time.
 
 Match data is from [Cricsheet and its contributors](https://cricsheet.org/). The charting library is vendored ECharts 5.5.1 with its Apache 2.0 license in docs/vendor/.

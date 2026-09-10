@@ -1,8 +1,9 @@
 "use strict";
 
 const C = { teal: "#57d8c3", gold: "#efb45b", red: "#ed7d76", blue: "#7ab6ff", muted: "#96aabd", grid: "#294357", text: "#f3f5ee" };
-const state = { matches: [], atlas: null, players: null, report: null, manifest: null,
-  replayCache: {}, trace: [], match: null, selected: 0, loadToken: 0, playerType: "batters", timer: null, charts: {} };
+const state = { matches: [], atlas: null, players: null, report: null, manifest: null, scenarioModel: null,
+  replayCache: {}, trace: [], match: null, selected: 0, loadToken: 0, scenarioChoice: [4, 0],
+  playerType: "batters", timer: null, charts: {} };
 const $ = id => document.getElementById(id);
 const fmt = n => new Intl.NumberFormat("en-US").format(n);
 const pct = n => `${(n * 100).toFixed(1)}%`;
@@ -56,6 +57,7 @@ function updateMatchList() {
     $("matchSub").textContent = "Try another team or season.";
     state.trace = [];
     chart("replayChart").clear();
+    chart("scenarioChart").clear();
     $("turningPoints").innerHTML = "";
     return;
   }
@@ -142,6 +144,107 @@ function selectMoment(index) {
   $("momentSwing").textContent = `${shift >= 0 ? "+" : ""}${(shift * 100).toFixed(1)} pp`;
   $("momentSwing").style.color = shift >= 0 ? C.teal : C.red;
   chart("replayChart").dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: state.selected });
+  renderScenario();
+}
+
+function calibratedProbability(features) {
+  const model = state.scenarioModel;
+  let z = model.intercept;
+  for (let i = 0; i < features.length; i++) {
+    z += model.coefficients[i] * (features[i] - model.mean[i]) / model.scale[i];
+  }
+  const raw = 1 / (1 + Math.exp(-Math.max(-50, Math.min(50, z))));
+  const xs = model.thresholds, ys = model.calibrated_values;
+  if (raw <= xs[0]) return ys[0];
+  for (let i = 1; i < xs.length; i++) {
+    if (raw <= xs[i]) {
+      const fraction = (raw - xs[i - 1]) / (xs[i] - xs[i - 1]);
+      return ys[i - 1] + fraction * (ys[i] - ys[i - 1]);
+    }
+  }
+  return ys[ys.length - 1];
+}
+
+function nextBallProbability(nextRuns, nextWicket) {
+  const point = state.trace[state.selected];
+  const runs = point[2] + nextRuns;
+  const wickets = point[3] + nextWicket;
+  const legal = point[1] + 1;
+  const limit = state.match.overs * 6;
+  if (runs >= state.match.target) return 1;
+  if (wickets >= 10 || legal >= limit) return 0;
+  let recentRuns = nextRuns, recentWickets = nextWicket;
+  for (let i = state.selected; i >= Math.max(0, state.selected - 10); i--) {
+    recentRuns += state.trace[i][8];
+    recentWickets += state.trace[i][3] - (i ? state.trace[i - 1][3] : 0);
+  }
+  const needed = state.match.target - runs;
+  const left = limit - legal;
+  return calibratedProbability([
+    2, state.match.target, runs, wickets, legal, left, needed,
+    6 * runs / legal, 6 * needed / left, recentRuns, recentWickets,
+  ]);
+}
+
+function renderScenario() {
+  if (!state.trace.length || state.selected === state.trace.length - 1) {
+    chart("scenarioChart").clear();
+    $("scenarioCurrent").textContent = state.trace.length ? pct(state.trace[state.selected][4]) : "—";
+    $("scenarioChoice").textContent = "Next ball";
+    $("scenarioProjected").textContent = "—";
+    $("scenarioDelta").textContent = "—";
+    $("scenarioNote").textContent = "Select an earlier delivery to explore a next-ball scenario.";
+    return;
+  }
+  const runOptions = [0, 1, 2, 3, 4, 6];
+  const current = state.trace[state.selected][4];
+  const data = [];
+  for (let wicket = 0; wicket <= 1; wicket++) {
+    runOptions.forEach((runs, x) => {
+      const probability = nextBallProbability(runs, wicket);
+      const chosen = runs === state.scenarioChoice[0] && wicket === state.scenarioChoice[1];
+      data.push({
+        value: [x, wicket, +(probability * 100).toFixed(1)],
+        probability,
+        itemStyle: { borderColor: chosen ? C.text : "#0b1c2a", borderWidth: chosen ? 3 : 3 },
+      });
+    });
+  }
+  const instance = chart("scenarioChart");
+  instance.setOption({
+    animation: false,
+    grid: { left: 92, right: 15, top: 18, bottom: 38 },
+    tooltip: { ...tooltipBase, formatter: item => {
+      const runs = runOptions[item.data.value[0]];
+      const wicket = item.data.value[1];
+      return (wicket ? "Wicket" : "No wicket") + " · " + runs + " runs<br>Chase win: " + pct(item.data.probability);
+    } },
+    xAxis: { type: "category", name: "Runs on next legal ball", nameLocation: "middle", nameGap: 25,
+      data: runOptions.map(String), nameTextStyle: { color: C.muted, fontSize: 11 }, axisLabel,
+      axisLine: { lineStyle: { color: C.grid } } },
+    yAxis: { type: "category", data: ["No wicket", "Wicket"], axisLabel,
+      axisLine: { lineStyle: { color: C.grid } } },
+    visualMap: { min: 0, max: 100, show: false, inRange: { color: ["#a94e54", "#735f57", "#347c83", "#57d8c3"] } },
+    series: [{ type: "heatmap", data, label: { show: true, color: C.text, fontWeight: "bold",
+      formatter: item => item.data.value[2].toFixed(1) + "%" },
+      emphasis: { itemStyle: { shadowBlur: 10, shadowColor: "#0009" } } }],
+  }, true);
+  instance.off("click");
+  instance.on("click", item => {
+    if (!item.data || !item.data.value) return;
+    state.scenarioChoice = [runOptions[item.data.value[0]], item.data.value[1]];
+    renderScenario();
+  });
+  const selected = nextBallProbability(...state.scenarioChoice);
+  const delta = 100 * (selected - current);
+  $("scenarioCurrent").textContent = pct(current);
+  $("scenarioChoice").textContent = state.scenarioChoice[0] + " runs · " +
+    (state.scenarioChoice[1] ? "wicket" : "no wicket");
+  $("scenarioProjected").textContent = pct(selected);
+  $("scenarioDelta").textContent = (delta >= 0 ? "+" : "") + delta.toFixed(1) + " pp";
+  $("scenarioDelta").style.color = delta >= 0 ? C.teal : C.red;
+  $("scenarioNote").textContent = "One legal ball from " + state.trace[state.selected][2] + "/" +
+    state.trace[state.selected][3] + " chasing " + state.match.target + ".";
 }
 
 function renderTurningPoints() {
@@ -282,9 +385,9 @@ function renderAudit() {
 
 async function init() {
   try {
-    [state.manifest, state.matches, state.atlas, state.players, state.report] = await Promise.all([
+    [state.manifest, state.matches, state.atlas, state.players, state.report, state.scenarioModel] = await Promise.all([
       fetchJson("./data/manifest.json"), fetchJson("./data/matches.json"), fetchJson("./data/atlas.json"),
-      fetchJson("./data/players.json"), fetchJson("./data/report.json")
+      fetchJson("./data/players.json"), fetchJson("./data/report.json"), fetchJson("./data/scenario_model.json")
     ]);
     bootMetrics();
     setupMatchControls();
