@@ -1,35 +1,45 @@
-# IPL analytics
+# IPL (Cricsheet)
 
-Exploratory analysis and modeling on Indian Premier League ball-by-ball JSON
-from Cricsheet. Scripts import the bundled dataset, build aggregates, and emit
-charts for batting and team trends.
+Ball-by-ball **Indian Premier League** analytics on Cricsheet JSON: ETL into cleaned CSVs, exploratory visuals, and sklearn models for rankings and match outcomes.
 
-## Architecture
+## Pipeline
 
 ```mermaid
 flowchart LR
-  JSON[Cricsheet JSON files] --> Import[import_ipl_data.py]
-  Import --> Tables[CSV / frames in repo]
-  Tables --> Viz[ipl_visuals.py]
-  Tables --> Model[ipl_modeling.py]
-  Viz --> Figures[PNG outputs]
+  JSON[Cricsheet JSON] --> Ingest[import_ipl_data.py]
+  Ingest --> Clean[ipl_matches_cleaned.csv / ipl_balls_cleaned.csv]
+  Clean --> Sum[summary_batters.csv / summary_bowlers.csv]
+  Sum --> Viz[ipl_visuals.py]
+  Sum --> ML[ipl_modeling.py]
+  Viz --> PNG[figures]
+  ML --> Rank[model_*_rankings.csv]
 ```
 
-## Data
+`import_ipl_data.py` walks the bundled archive (see `README.txt` for provenance and match index). Downstream scripts assume cleaned tables exist.
 
-`README.txt` documents the Cricsheet IPL archive provenance. JSON match files
-sit alongside the Python tooling in this repository.
+## Modeling (`ipl_modeling.py`)
+
+- Composite **batting** and **bowling** scores (rate + volume weighting)
+- **RandomForest** / **LogisticRegression** experiments on match outcomes
+- Cross-validation and holdout metrics; exports ranked CSVs for inspection
+
+## Visuals (`ipl_visuals.py`)
+
+Matplotlib, Seaborn, Plotly, and NetworkX charts: team trends, player comparisons, 3D and network views where useful.
 
 ## Run
 
 ```bash
-make setup
-make all
+make setup    # venv + requirements.txt
+make all      # ingest → visuals → model
 ```
 
-Or run stages individually: `make ingest`, `make visuals`, `make model`.
-Pipeline details are in `docs/ARCHITECTURE.md`.
+Stages: `make ingest`, `make visuals`, `make model`. Details in `docs/ARCHITECTURE.md`.
 
-## License
+## Dependencies
 
-Cricket data © Cricsheet contributors; code MIT unless noted in file headers.
+Pinned in `requirements.txt` (pandas, numpy, scikit-learn, plotly, tqdm, etc.).
+
+## Data
+
+Cricket data © Cricsheet contributors. Code MIT unless noted in file headers.
