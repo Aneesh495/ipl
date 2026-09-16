@@ -5,13 +5,15 @@ const state = { matches: [], atlas: null, players: null, report: null, manifest:
   replayCache: {}, trace: [], match: null, selected: 0, loadToken: 0, scenarioChoice: [4, 0],
   playerType: "batters", timer: null, charts: {} };
 const $ = id => document.getElementById(id);
+const BUILD_VERSION = document.documentElement.dataset.build || "";
 const fmt = n => new Intl.NumberFormat("en-US").format(n);
 const pct = n => `${(n * 100).toFixed(1)}%`;
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 const shortTeam = name => ({ "Royal Challengers Bengaluru": "RCB", "Chennai Super Kings": "CSK", "Mumbai Indians": "MI", "Kolkata Knight Riders": "KKR", "Sunrisers Hyderabad": "SRH", "Punjab Kings": "PBKS", "Delhi Capitals": "DC", "Rajasthan Royals": "RR", "Gujarat Titans": "GT", "Lucknow Super Giants": "LSG" }[name] || name);
 
 async function fetchJson(path) {
-  const response = await fetch(path);
+  const url = BUILD_VERSION ? `${path}?v=${BUILD_VERSION}` : path;
+  const response = await fetch(url);
   if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
   return response.json();
 }
@@ -45,6 +47,29 @@ function setupMatchControls() {
   updateMatchList();
 }
 
+function clearMatchView(title, description) {
+  state.match = null;
+  state.trace = [];
+  state.selected = 0;
+  $("errorBanner").hidden = true;
+  $("matchDate").textContent = "MATCH REPLAY";
+  $("matchTitle").textContent = title;
+  $("matchSub").textContent = description;
+  $("matchResult").textContent = "—";
+  $("matchTarget").textContent = "—";
+  $("momentOver").textContent = "—";
+  $("momentScore").textContent = "—";
+  $("momentEvent").textContent = "Choose a match to inspect its deliveries.";
+  $("momentProbability").textContent = "—";
+  $("momentBarFill").style.width = "0%";
+  $("momentSwing").textContent = "—";
+  $("ballSlider").max = 0;
+  $("ballSlider").value = 0;
+  $("turningPoints").innerHTML = "";
+  chart("replayChart").clear();
+  renderScenario();
+}
+
 function updateMatchList() {
   stopPlayback();
   const year = Number($("seasonSelect").value);
@@ -53,12 +78,7 @@ function updateMatchList() {
   $("matchSelect").innerHTML = choices.map(m => `<option value="${m.id}">${escapeHtml(m.date)} · ${escapeHtml(shortTeam(m.team1))} vs ${escapeHtml(shortTeam(m.team2))}${m.stage ? ` · ${escapeHtml(m.stage)}` : ""}</option>`).join("");
   if (!choices.length) {
     state.loadToken++;
-    $("matchTitle").textContent = "No standard chase in this filter";
-    $("matchSub").textContent = "Try another team or season.";
-    state.trace = [];
-    chart("replayChart").clear();
-    chart("scenarioChart").clear();
-    $("turningPoints").innerHTML = "";
+    clearMatchView("No standard chase in this filter", "Try another team or season.");
     return;
   }
   const preferred = choices.find(m => m.id === 1535465) || choices[0];
@@ -71,12 +91,14 @@ async function loadMatch(id) {
   const match = state.matches.find(m => m.id === id);
   if (!match) return;
   const token = ++state.loadToken;
+  clearMatchView("Loading match…", "Fetching the season replay.");
   state.match = match;
   const year = String(match.season);
   try {
     if (!state.replayCache[year]) state.replayCache[year] = await fetchJson(`./data/replays/${year}.json`);
   } catch (error) {
     if (token === state.loadToken) {
+      clearMatchView("Replay unavailable", "Try selecting the match again.");
       $("errorBanner").hidden = false;
       $("errorBanner").textContent = `Could not load ${year} replay data: ${error.message}`;
     }
@@ -84,6 +106,13 @@ async function loadMatch(id) {
   }
   if (token !== state.loadToken) return;
   state.trace = state.replayCache[year][String(id)] || [];
+  if (!state.trace.length) {
+    clearMatchView("Replay unavailable", "This match has no replay data.");
+    $("errorBanner").hidden = false;
+    $("errorBanner").textContent = `No replay found for match ${id}.`;
+    return;
+  }
+  $("errorBanner").hidden = true;
   $("matchDate").textContent = `${match.date} · ${match.stage || `SEASON ${match.season}`} · #${match.id}`.toUpperCase();
   $("matchTitle").textContent = `${match.team1}  vs  ${match.team2}`;
   $("matchSub").textContent = `${match.venue || "Venue unlisted"} · ${match.batting} chasing`;
@@ -92,7 +121,17 @@ async function loadMatch(id) {
   $("ballSlider").max = Math.max(0, state.trace.length - 1);
   renderReplay();
   renderTurningPoints();
-  selectMoment(Math.floor(state.trace.length * .68));
+  let informativeMoment = 0;
+  let nearestEvenChance = Infinity;
+  for (let i = 0; i < state.trace.length - 1; i++) {
+    if (state.trace[i][1] < 6) continue;
+    const distance = Math.abs(state.trace[i][4] - 0.5);
+    if (distance < nearestEvenChance) {
+      informativeMoment = i;
+      nearestEvenChance = distance;
+    }
+  }
+  selectMoment(informativeMoment);
 }
 
 function overText(legal) { return `${Math.floor(legal / 6)}.${legal % 6}`; }
@@ -111,7 +150,7 @@ function renderReplay() {
         const point = trace[entry.data[2]];
         return `<b>After ${overText(point[1])} overs · ${point[2]}/${point[3]}</b><br>${escapeHtml(point[6])} facing ${escapeHtml(point[7])}<br><span style="color:${C.teal}">●</span> Logistic ${pct(point[4])}<br><span style="color:${C.gold}">●</span> Boosted ${pct(point[5])}`;
       } },
-    xAxis: { type: "value", min: 0, max: 20, name: "Overs", nameLocation: "middle", nameGap: 28,
+    xAxis: { type: "value", min: 0, max: state.match.overs, name: "Overs", nameLocation: "middle", nameGap: 28,
       nameTextStyle: { color: C.muted }, axisLabel: { ...axisLabel, formatter: v => v.toFixed(0) },
       axisLine: { lineStyle: { color: C.grid } }, splitLine },
     yAxis: { type: "value", min: 0, max: 100, axisLabel: { ...axisLabel, formatter: v => `${v}%` },
@@ -189,6 +228,10 @@ function nextBallProbability(nextRuns, nextWicket) {
 function renderScenario() {
   if (!state.trace.length || state.selected === state.trace.length - 1) {
     chart("scenarioChart").clear();
+    $("scenarioEnd").hidden = false;
+    $("scenarioEnd").textContent = state.trace.length
+      ? "Match complete. Select an earlier delivery to explore a next-ball scenario."
+      : "Choose a match to explore next-ball scenarios.";
     $("scenarioCurrent").textContent = state.trace.length ? pct(state.trace[state.selected][4]) : "—";
     $("scenarioChoice").textContent = "Next ball";
     $("scenarioProjected").textContent = "—";
@@ -196,6 +239,8 @@ function renderScenario() {
     $("scenarioNote").textContent = "Select an earlier delivery to explore a next-ball scenario.";
     return;
   }
+  $("scenarioEnd").hidden = true;
+  const mobile = window.innerWidth < 600;
   const runOptions = [0, 1, 2, 3, 4, 6];
   const current = state.trace[state.selected][4];
   const data = [];
@@ -204,35 +249,36 @@ function renderScenario() {
       const probability = nextBallProbability(runs, wicket);
       const chosen = runs === state.scenarioChoice[0] && wicket === state.scenarioChoice[1];
       data.push({
-        value: [x, wicket, +(probability * 100).toFixed(1)],
-        probability,
-        itemStyle: { borderColor: chosen ? C.text : "#0b1c2a", borderWidth: chosen ? 3 : 3 },
+        value: mobile ? [wicket, x, +(probability * 100).toFixed(1)] : [x, wicket, +(probability * 100).toFixed(1)],
+        probability, runs, wicket,
+        itemStyle: { borderColor: chosen ? C.text : "#0b1c2a", borderWidth: 3 },
       });
     });
   }
   const instance = chart("scenarioChart");
   instance.setOption({
     animation: false,
-    grid: { left: 92, right: 15, top: 18, bottom: 38 },
+    grid: { left: mobile ? 55 : 92, right: 15, top: 18, bottom: mobile ? 45 : 38 },
     tooltip: { ...tooltipBase, formatter: item => {
-      const runs = runOptions[item.data.value[0]];
-      const wicket = item.data.value[1];
-      return (wicket ? "Wicket" : "No wicket") + " · " + runs + " runs<br>Chase win: " + pct(item.data.probability);
+      return (item.data.wicket ? "Wicket" : "No wicket") + " · " + item.data.runs +
+        " runs<br>Chase win: " + pct(item.data.probability);
     } },
-    xAxis: { type: "category", name: "Runs on next legal ball", nameLocation: "middle", nameGap: 25,
-      data: runOptions.map(String), nameTextStyle: { color: C.muted, fontSize: 11 }, axisLabel,
+    xAxis: { type: "category", name: mobile ? "Wicket on next ball?" : "Runs on next legal ball",
+      nameLocation: "middle", nameGap: 25, data: mobile ? ["No", "Yes"] : runOptions.map(String),
+      nameTextStyle: { color: C.muted, fontSize: 11 }, axisLabel,
       axisLine: { lineStyle: { color: C.grid } } },
-    yAxis: { type: "category", data: ["No wicket", "Wicket"], axisLabel,
+    yAxis: { type: "category", data: mobile ? runOptions.map(String) : ["No wicket", "Wicket"],
+      name: mobile ? "Runs" : "", nameTextStyle: { color: C.muted, fontSize: 11 }, axisLabel,
       axisLine: { lineStyle: { color: C.grid } } },
     visualMap: { min: 0, max: 100, show: false, inRange: { color: ["#a94e54", "#735f57", "#347c83", "#57d8c3"] } },
-    series: [{ type: "heatmap", data, label: { show: true, color: C.text, fontWeight: "bold",
+    series: [{ type: "heatmap", data, label: { show: true, color: C.text, fontWeight: "bold", fontSize: mobile ? 10 : 11,
       formatter: item => item.data.value[2].toFixed(1) + "%" },
       emphasis: { itemStyle: { shadowBlur: 10, shadowColor: "#0009" } } }],
   }, true);
   instance.off("click");
   instance.on("click", item => {
     if (!item.data || !item.data.value) return;
-    state.scenarioChoice = [runOptions[item.data.value[0]], item.data.value[1]];
+    state.scenarioChoice = [item.data.runs, item.data.wicket];
     renderScenario();
   });
   const selected = nextBallProbability(...state.scenarioChoice);
@@ -248,7 +294,7 @@ function renderScenario() {
 }
 
 function renderTurningPoints() {
-  const points = state.trace.slice(1).map((p, i) => ({ index: i + 1, p, swing: p[4] - state.trace[i][4] }))
+  const points = state.trace.slice(1, -1).map((p, i) => ({ index: i + 1, p, swing: p[4] - state.trace[i][4] }))
     .sort((a, b) => Math.abs(b.swing) - Math.abs(a.swing)).slice(0, 5);
   $("turningPoints").innerHTML = points.map(item => `<button type="button" class="turning-item ${item.swing < 0 ? "negative" : ""}" data-index="${item.index}"><strong>${item.swing > 0 ? "+" : ""}${(item.swing * 100).toFixed(1)} pp</strong><span>Over ${overText(item.p[1])} · ${escapeHtml(item.p[6])}${item.p[9] ? ` · ${escapeHtml(item.p[9])}` : ` · ${item.p[8]} runs`}</span></button>`).join("");
   $("turningPoints").querySelectorAll("button").forEach(button => button.addEventListener("click", () => selectMoment(Number(button.dataset.index))));
@@ -275,7 +321,10 @@ function renderEra() {
   chart("eraChart").setOption({
     grid: { left: 50, right: 55, top: 38, bottom: 42 }, tooltip: { ...tooltipBase, trigger: "axis" },
     legend: { data: ["Run rate", "First innings average"], top: 0, right: 0, textStyle: { color: C.muted, fontSize: 11 } },
-    xAxis: { type: "category", data: years, axisLabel: { ...axisLabel, interval: 2 }, axisLine: { lineStyle: { color: C.grid } } },
+    xAxis: { type: "category", data: years,
+      axisLabel: { ...axisLabel, interval: 0,
+        formatter: (value, index) => index === 0 || index === years.length - 1 || index % 4 === 0 ? value : "" },
+      axisLine: { lineStyle: { color: C.grid } } },
     yAxis: [{ type: "value", min: 6, max: 12, axisLabel, splitLine }, { type: "value", min: 100, max: 220, axisLabel, splitLine: { show: false } }],
     series: [
       { name: "Run rate", type: "line", smooth: .25, data: seasons.map(s => s.run_rate), symbolSize: 5, lineStyle: { color: C.teal, width: 3 }, itemStyle: { color: C.teal } },
@@ -394,7 +443,10 @@ async function init() {
     renderEra();
     setupPlayers();
     renderAudit();
-    window.addEventListener("resize", () => Object.values(state.charts).forEach(c => c.resize()));
+    window.addEventListener("resize", () => {
+      Object.values(state.charts).forEach(c => c.resize());
+      if (state.trace.length) renderScenario();
+    });
   } catch (error) {
     $("errorBanner").hidden = false;
     $("errorBanner").textContent = `IPL Decision Lab could not load its data: ${error.message}. Serve the repository with make serve.`;

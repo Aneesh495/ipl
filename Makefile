@@ -1,4 +1,4 @@
-.PHONY: setup refresh ingest train site all test serve
+.PHONY: setup refresh ingest train site assets all test serve
 
 PYTHON := .venv/bin/python
 
@@ -16,10 +16,15 @@ train: ingest
 
 site: train
 	$(PYTHON) scripts/build_site_data.py
+	$(PYTHON) scripts/fingerprint_site.py
+
+assets:
+	$(PYTHON) scripts/fingerprint_site.py
 
 all: site
 
 test:
+	$(PYTHON) scripts/fingerprint_site.py --check
 	$(PYTHON) -m unittest discover -s tests -v
 	node tests/site_smoke.cjs
 

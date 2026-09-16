@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-build="08f7e0ef41f8c10f">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#07111d">
   <meta name="description" content="Explore every IPL season, ball by ball, with honest machine learning and interactive match replays.">
   <title>IPL Decision Lab | Every ball changes the game</title>
-  <link rel="stylesheet" href="./styles.css">
-  <script src="./vendor/echarts.min.js" defer></script>
-  <script src="./app.js" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=08f7e0ef41f8c10f">
+  <script src="./vendor/echarts.min.js?v=08f7e0ef41f8c10f" defer></script>
+  <script src="./app.js?v=08f7e0ef41f8c10f" defer></script>
 </head>
 <body>
   <div class="site-shell">
@@ -63,7 +63,10 @@
           <div class="card-top"><div><span class="card-kicker">NEXT BALL LAB / LIVE MODEL</span><h3>What if the next ball goes differently?</h3></div><span class="muted">Click any square to inspect the forecast</span></div>
           <p class="scenario-intro">From the selected moment above, simulate one legal delivery. Each square recomputes the calibrated logistic model with a different run and wicket outcome.</p>
           <div class="scenario-layout">
-            <div id="scenarioChart" class="chart scenario-chart" role="img" aria-label="Next-ball win probability scenario heatmap"></div>
+            <div class="scenario-plot">
+              <div id="scenarioChart" class="chart scenario-chart" role="img" aria-label="Next-ball win probability scenario heatmap"></div>
+              <div id="scenarioEnd" class="scenario-end" hidden>Select an earlier delivery to explore a next-ball scenario.</div>
+            </div>
             <div class="scenario-readout">
               <div><span>Current forecast</span><strong id="scenarioCurrent">—</strong></div>
               <div><span id="scenarioChoice">Next ball</span><strong id="scenarioProjected">—</strong></div>
@@ -80,15 +83,15 @@
         <div class="atlas-grid">
           <div class="card chart-card wide"><div class="card-top"><div><span class="card-kicker">2008–2026</span><h3>Scoring velocity</h3></div></div><div id="eraChart" class="chart atlas-chart" role="img" aria-label="Season scoring trend chart"></div><div class="chart-caption">Runs per six legal balls. Runs on wides and no-balls remain in the numerator.</div></div>
           <div class="card insight-card"><span class="card-kicker">LONG VIEW</span><div class="insight-value" id="eraChange">—</div><h3>Scoring changed.</h3><p id="eraNarrative">Loading...</p><div class="insight-rule"></div><span class="microcopy">2008 versus 2026 · league wide</span></div>
-          <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">PHASES OF PLAY</span><h3>The over map</h3></div><label class="inline-select">Show<select id="phaseMetric"><option value="run_rate">Run rate</option><option value="boundary_pct">Boundary %</option><option value="wicket_pct">Wicket %</option></select></label></div><div id="phaseChart" class="chart heat-chart" role="img" aria-label="Season by innings phase heatmap"></div></div>
-          <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">FRANCHISE HISTORY</span><h3>Win rate by season</h3></div><span class="muted">Seasons played only</span></div><div id="teamChart" class="chart heat-chart" role="img" aria-label="Team win rate heatmap"></div></div>
+          <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">PHASES OF PLAY</span><h3>The over map</h3></div><label class="inline-select">Show<select id="phaseMetric"><option value="run_rate">Run rate</option><option value="boundary_pct">Boundary %</option><option value="wicket_pct">Wicket %</option></select></label></div><div class="chart-scroll"><div id="phaseChart" class="chart heat-chart" role="img" aria-label="Season by innings phase heatmap"></div></div><div class="chart-caption mobile-scroll-hint">Swipe the chart to see every season.</div></div>
+          <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">FRANCHISE HISTORY</span><h3>Win rate by season</h3></div><span class="muted">Seasons played only</span></div><div class="chart-scroll"><div id="teamChart" class="chart heat-chart" role="img" aria-label="Team win rate heatmap"></div></div><div class="chart-caption mobile-scroll-hint">Swipe the chart to see every season.</div></div>
         </div>
       </section>
 
       <section id="players" class="section">
         <div class="section-head"><div><span class="section-no">03 / PLAYER LANDSCAPE</span><h2>Find the outliers.</h2><p>Career production and recent context-adjusted performance. The run model controls for match state, then shrinks small samples toward zero.</p></div><span class="section-ornament">↗</span></div>
-        <div class="filter-bar"><div class="segmented" role="group" aria-label="Player type"><button id="battersTab" class="active" type="button">Batters</button><button id="bowlersTab" type="button">Bowlers</button></div><label>Minimum legal balls<select id="minBalls"><option value="100">100</option><option value="300" selected>300</option><option value="600">600</option><option value="1000">1,000</option></select></label><span class="filter-note">Dot size = career volume · color = most recent season</span></div>
-        <div class="player-grid"><div class="card chart-card"><div class="card-top"><div><span class="card-kicker" id="playerKicker">BATTING FINGERPRINTS</span><h3 id="playerTitle">Power meets volume</h3></div></div><div id="playerChart" class="chart player-chart" role="img" aria-label="Player performance scatter chart"></div><div class="chart-caption" id="playerCaption">Each dot is one player with the selected minimum of legal balls.</div></div><div class="card leaderboard-card"><span class="card-kicker">2025–26 MODEL RESIDUALS</span><h3 id="leaderboardTitle">Context lift</h3><p class="muted" id="leaderboardDescription">Observed batter runs above the next-ball model expectation per 100 legal balls, shrunk toward zero.</p><div id="leaderboard"></div><div class="caution">Association, not causal player value. Bowlers, venues, matchups, and selection still matter.</div></div></div>
+        <div class="filter-bar"><div class="segmented" role="group" aria-label="Player type"><button id="battersTab" class="active" type="button">Batters</button><button id="bowlersTab" type="button">Bowlers</button></div><label>Minimum balls<select id="minBalls"><option value="100">100</option><option value="300" selected>300</option><option value="600">600</option><option value="1000">1,000</option></select></label><span class="filter-note">Batters: balls faced · bowlers: legal balls · dot size = career volume</span></div>
+        <div class="player-grid"><div class="card chart-card"><div class="card-top"><div><span class="card-kicker" id="playerKicker">BATTING FINGERPRINTS</span><h3 id="playerTitle">Power meets volume</h3></div></div><div id="playerChart" class="chart player-chart" role="img" aria-label="Player performance scatter chart"></div><div class="chart-caption" id="playerCaption">Each dot is one player meeting the selected minimum.</div></div><div class="card leaderboard-card"><span class="card-kicker">2025–26 MODEL RESIDUALS</span><h3 id="leaderboardTitle">Context lift</h3><p class="muted" id="leaderboardDescription">Observed batter runs above the next-ball model expectation per 100 legal balls, shrunk toward zero.</p><div id="leaderboard"></div><div class="caution">Association, not causal player value. Bowlers, venues, matchups, and selection still matter.</div></div></div>
       </section>
 
       <section id="audit" class="section audit-section">

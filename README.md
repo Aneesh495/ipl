@@ -17,11 +17,14 @@ The static app is in [docs/](docs/index.html). It works without an API or databa
 ~~~bash
 make setup     # install uv first: https://docs.astral.sh/uv/getting-started/installation/
 make all       # rebuild SQLite, models, and browser data from checked-in JSON
-make test      # data checks and a DOM-free app smoke test
+make assets    # refresh the shared asset version after frontend edits
+make test      # data checks, asset-version check, and app smoke test
 make serve     # open http://localhost:8000/docs/
 ~~~
 
 The data snapshot is already committed. Run make refresh to download the latest IPL JSON archive from Cricsheet, validate it, and update json/, README.txt, and data_manifest.json. Review the new manifest and rebuild after a refresh. The checked-in snapshot's SHA-256 and retrieval timestamp are in [data_manifest.json](data_manifest.json).
+
+GitHub Pages caches HTML, scripts, styles, and data independently. The build gives every published asset the same content-derived URL version so a returning browser loads one consistent release. Run `make assets` after changing `docs/app.js` or `docs/styles.css`; `make test` rejects stale version tags.
 
 ## What the models actually did
 
