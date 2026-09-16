@@ -23,13 +23,12 @@ sit alongside the Python tooling in this repository.
 ## Run
 
 ```bash
-python3 import_ipl_data.py
-python3 ipl_visuals.py
-python3 ipl_modeling.py
+make setup
+make all
 ```
 
-Use a virtual environment if you add dependencies beyond the standard library
-and plotting stack already referenced in the scripts.
+Or run stages individually: `make ingest`, `make visuals`, `make model`.
+Pipeline details are in `docs/ARCHITECTURE.md`.
 
 ## License
 
