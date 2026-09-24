@@ -65,6 +65,7 @@ function clearMatchView(title, description) {
   $("momentSwing").textContent = "—";
   $("ballSlider").max = 0;
   $("ballSlider").value = 0;
+  $("playButton").disabled = true;
   $("turningPoints").innerHTML = "";
   chart("replayChart").clear();
   renderScenario();
@@ -119,6 +120,7 @@ async function loadMatch(id) {
   $("matchResult").textContent = match.winner ? `${shortTeam(match.winner)} won` : "No result";
   $("matchTarget").textContent = `Target ${match.target} · Chase ${match.chase_runs}`;
   $("ballSlider").max = Math.max(0, state.trace.length - 1);
+  $("playButton").disabled = false;
   renderReplay();
   renderTurningPoints();
   let informativeMoment = 0;
@@ -283,12 +285,13 @@ function renderScenario() {
   });
   const selected = nextBallProbability(...state.scenarioChoice);
   const delta = 100 * (selected - current);
+  const displayedDelta = Math.abs(delta) < 0.05 ? 0 : delta;
   $("scenarioCurrent").textContent = pct(current);
   $("scenarioChoice").textContent = state.scenarioChoice[0] + " runs · " +
     (state.scenarioChoice[1] ? "wicket" : "no wicket");
   $("scenarioProjected").textContent = pct(selected);
-  $("scenarioDelta").textContent = (delta >= 0 ? "+" : "") + delta.toFixed(1) + " pp";
-  $("scenarioDelta").style.color = delta >= 0 ? C.teal : C.red;
+  $("scenarioDelta").textContent = (displayedDelta > 0 ? "+" : "") + displayedDelta.toFixed(1) + " pp";
+  $("scenarioDelta").style.color = displayedDelta >= 0 ? C.teal : C.red;
   $("scenarioNote").textContent = "One legal ball from " + state.trace[state.selected][2] + "/" +
     state.trace[state.selected][3] + " chasing " + state.match.target + ".";
 }
@@ -302,6 +305,7 @@ function renderTurningPoints() {
 
 function stopPlayback() { if (state.timer) { clearInterval(state.timer); state.timer = null; } $("playButton").innerHTML = "▶ &nbsp;Play replay"; }
 function togglePlayback() {
+  if (!state.trace.length) return;
   if (state.timer) return stopPlayback();
   selectMoment(0);
   $("playButton").textContent = "Ⅱ  Pause";

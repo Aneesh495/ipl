@@ -66,6 +66,7 @@ vm.runInContext(source + '\nglobalThis.testApi = { state, loadMatch, updateMatch
   assert.equal(state.matches.length, 1243);
   assert.equal(state.match.season, 2026);
   assert.ok(state.trace.length > 100);
+  assert.equal(document.getElementById('playButton').disabled, false);
   assert.ok(state.trace[state.selected][4] < 0.9, 'Initial match starts at an informative moment');
   assert.match(document.getElementById('matchTitle').textContent, /vs/);
   assert.equal(document.getElementById('errorBanner').hidden, true);
@@ -119,6 +120,7 @@ vm.runInContext(source + '\nglobalThis.testApi = { state, loadMatch, updateMatch
   assert.equal(document.getElementById('matchResult').textContent, '—');
   assert.equal(document.getElementById('momentScore').textContent, '—');
   assert.equal(document.getElementById('scenarioCurrent').textContent, '—');
+  assert.equal(document.getElementById('playButton').disabled, true);
   assert.equal(state.charts.scenarioChart.option, null);
   const normalFetch = context.fetch;
   let finishSlowReplay;
@@ -130,6 +132,7 @@ vm.runInContext(source + '\nglobalThis.testApi = { state, loadMatch, updateMatch
   assert.equal(state.trace.length, 0);
   assert.equal(document.getElementById('momentScore').textContent, '—');
   await loadMatch(1535465);
+  assert.equal(document.getElementById('playButton').disabled, false);
   finishSlowReplay();
   await slowLoad;
   assert.equal(state.match.id, 1535465, 'Late response cannot replace a newer match');
