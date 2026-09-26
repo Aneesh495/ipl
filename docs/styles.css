@@ -20,3 +20,6 @@ footer{display:flex;justify-content:space-between;gap:30px;border-top:1px solid 
 .scenario-plot{position:relative;min-width:0}.scenario-end{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;border:1px dashed var(--line);border-radius:8px;color:var(--muted);font-size:13px;line-height:1.6;background:#0c2030}.scenario-end[hidden]{display:none}.chart-scroll{width:100%;overflow-x:auto;overflow-y:hidden}.mobile-scroll-hint{display:none}
 @media(max-width:760px){.chart-scroll .heat-chart{min-width:640px}.mobile-scroll-hint{display:block}.scenario-chart{height:400px}}
 .button:disabled{opacity:.45;cursor:not-allowed}.button:disabled:hover{transform:none;border-color:#67808b}
+@media(max-width:1100px){.atlas-grid,.audit-grid{grid-template-columns:1fr}.atlas-grid .wide{grid-column:auto}.insight-card{min-height:300px}}
+.chart-scroll .heat-chart{min-width:640px}
+@media(max-width:1540px){.mobile-scroll-hint{display:block}}
