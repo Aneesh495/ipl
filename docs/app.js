@@ -25,7 +25,9 @@ function chart(id) {
 
 const axisLabel = { color: C.muted, fontSize: 11 };
 const splitLine = { show: true, lineStyle: { color: C.grid, opacity: .55 } };
-const tooltipBase = { backgroundColor: "#122d3e", borderColor: "#427080", textStyle: { color: C.text, fontSize: 12 }, extraCssText: "box-shadow:0 14px 30px #0008;border-radius:8px;" };
+const tooltipBase = { backgroundColor: "#122d3e", borderColor: "#427080", confine: true,
+  textStyle: { color: C.text, fontSize: 12 },
+  extraCssText: "box-shadow:0 14px 30px #0008;border-radius:8px;max-width:min(260px,calc(100vw - 70px));white-space:normal;" };
 
 function bootMetrics() {
   $("metricMatches").textContent = fmt(state.manifest.matches);
@@ -184,7 +186,6 @@ function selectMoment(index) {
   $("momentBarFill").style.width = pct(p[4]);
   $("momentSwing").textContent = `${shift >= 0 ? "+" : ""}${(shift * 100).toFixed(1)} pp`;
   $("momentSwing").style.color = shift >= 0 ? C.teal : C.red;
-  chart("replayChart").dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: state.selected });
   renderScenario();
 }
 
@@ -426,7 +427,8 @@ function renderAudit() {
   const features = report.chase.feature_importance.filter(f => f.brier_increase > 0).slice(0, 7).reverse();
   chart("importanceChart").setOption({
     grid: { left: 135, right: 25, top: 20, bottom: 30 }, tooltip: { ...tooltipBase, formatter: x => `${x.name}<br>+${x.value.toFixed(4)} Brier` },
-    xAxis: { type: "value", axisLabel: { color: C.muted, formatter: v => v.toFixed(2) }, splitLine },
+    xAxis: { type: "value", splitNumber: 2,
+      axisLabel: { color: C.muted, hideOverlap: true, formatter: v => v.toFixed(2) }, splitLine },
     yAxis: { type: "category", data: features.map(f => f.feature.replaceAll("_", " ")), axisLabel: { color: C.muted, fontSize: 10 }, axisLine: { show: false } },
     series: [{ type: "bar", data: features.map(f => f.brier_increase), barWidth: 15, itemStyle: { color: C.gold, borderRadius: [0, 4, 4, 0] } }]
   });

@@ -74,6 +74,8 @@ vm.runInContext(source + '\nglobalThis.testApi = { state, loadMatch, updateMatch
     assert.ok(state.charts[id]?.option?.series?.length, `${id} has a series`);
   }
   assert.equal(state.charts.scenarioChart.option.series[0].data.length, 12);
+  assert.equal(state.charts.replayChart.option.tooltip.confine, true);
+  assert.equal(state.charts.importanceChart.option.xAxis.splitNumber, 2);
   for (const reference of state.scenarioModel.references) {
     assert.ok(Math.abs(calibratedProbability(reference.features) - reference.probability) < 1e-6);
   }
