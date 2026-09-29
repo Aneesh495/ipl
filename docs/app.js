@@ -178,14 +178,15 @@ function selectMoment(index) {
   const p = state.trace[state.selected];
   const previous = state.selected ? state.trace[state.selected - 1][4] : p[4];
   const shift = p[4] - previous;
+  const displayedShift = Math.abs(shift) < 0.0005 ? 0 : shift;
   $("ballSlider").value = String(state.selected);
   $("momentOver").textContent = `OVER ${overText(p[1])} · DELIVERY ${p[0]}`;
   $("momentScore").textContent = `${p[2]}/${p[3]}`;
   $("momentEvent").textContent = `${p[6]} vs ${p[7]} · ${p[8]} run${p[8] === 1 ? "" : "s"}${p[9] ? ` · ${p[9]}` : ""}`;
   $("momentProbability").textContent = pct(p[4]);
   $("momentBarFill").style.width = pct(p[4]);
-  $("momentSwing").textContent = `${shift >= 0 ? "+" : ""}${(shift * 100).toFixed(1)} pp`;
-  $("momentSwing").style.color = shift >= 0 ? C.teal : C.red;
+  $("momentSwing").textContent = `${displayedShift > 0 ? "+" : ""}${(displayedShift * 100).toFixed(1)} pp`;
+  $("momentSwing").style.color = displayedShift >= 0 ? C.teal : C.red;
   renderScenario();
 }
 

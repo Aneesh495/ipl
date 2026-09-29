@@ -111,6 +111,9 @@ vm.runInContext(source + '\nglobalThis.testApi = { state, loadMatch, updateMatch
   await loadMatch(oldMatch.id);
   assert.equal(state.match.season, 2008);
   assert.ok(state.trace.length > 80);
+  await loadMatch(1304063);
+  selectMoment(81);
+  assert.equal(document.getElementById('momentSwing').textContent, '0.0 pp');
   setPlayerType('bowlers');
   assert.equal(document.getElementById('playerTitle').textContent, 'Control meets strike rate');
   document.getElementById('phaseMetric').value = 'boundary_pct';
