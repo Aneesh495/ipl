@@ -441,8 +441,7 @@ function renderAudit() {
     tooltip: { ...tooltipBase, trigger: "axis", axisPointer: { type: "shadow" },
       formatter: entries => `${entries[0].name}<br>${entries.map(item => `${item.marker} ${item.seriesName}: ${item.value.toFixed(2)} pp`).join("<br>")}` },
     legend: { data: ["Previous", "Repaired"], top: 0, textStyle: { color: C.muted, fontSize: 11 } },
-    xAxis: { type: "value", name: "Percentage points", nameLocation: "middle", nameGap: 26,
-      nameTextStyle: { color: C.muted }, axisLabel, splitLine },
+    xAxis: { type: "value", min: 0, max: 20, axisLabel, splitLine },
     yAxis: { type: "category", data: ["Middle · four", "Middle · dot", "Early · four", "Early · dot"],
       axisLabel: { color: C.muted, fontSize: 11 }, axisLine: { show: false } },
     series: [
