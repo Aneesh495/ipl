@@ -63,8 +63,10 @@ function clearMatchView(title, description) {
   $("momentScore").textContent = "—";
   $("momentEvent").textContent = "Choose a match to inspect its deliveries.";
   $("momentProbability").textContent = "—";
+  $("momentProbLabel").textContent = "Chase win probability";
   $("momentBarFill").style.width = "0%";
   $("momentSwing").textContent = "—";
+  $("momentSwingLabel").textContent = "Change on this delivery";
   $("ballSlider").max = 0;
   $("ballSlider").value = 0;
   $("playButton").disabled = true;
@@ -120,7 +122,7 @@ async function loadMatch(id) {
   $("matchTitle").textContent = `${match.team1}  vs  ${match.team2}`;
   $("matchSub").textContent = `${match.venue || "Venue unlisted"} · ${match.batting} chasing`;
   $("matchResult").textContent = match.winner ? `${shortTeam(match.winner)} won` : "No result";
-  $("matchTarget").textContent = `Target ${match.target} · Chase ${match.chase_runs}`;
+  $("matchTarget").textContent = `Target ${match.target} · Chase ${match.chase_runs} · ${match.overs} overs`;
   $("ballSlider").max = Math.max(0, state.trace.length - 1);
   $("playButton").disabled = false;
   renderReplay();
@@ -142,17 +144,19 @@ function overText(legal) { return `${Math.floor(legal / 6)}.${legal % 6}`; }
 
 function renderReplay() {
   const trace = state.trace;
-  const logistic = trace.map((p, i) => [p[1] / 6, +(p[4] * 100).toFixed(1), i]);
-  const boosted = trace.map((p, i) => [p[1] / 6, +(p[5] * 100).toFixed(1), i]);
-  const wickets = trace.map((p, i) => p[9] ? [p[1] / 6, +(p[4] * 100).toFixed(1), i] : null).filter(Boolean);
-  const sixes = trace.map((p, i) => p[8] >= 6 ? [p[1] / 6, +(p[4] * 100).toFixed(1), i] : null).filter(Boolean);
+  const forecasts = trace.slice(0, -1);
+  const logistic = forecasts.map((p, i) => [p[1] / 6, +(p[4] * 100).toFixed(1), i]);
+  const wickets = forecasts.map((p, i) => p[9] ? [p[1] / 6, +(p[4] * 100).toFixed(1), i] : null).filter(Boolean);
+  const sixes = forecasts.map((p, i) => p[8] >= 6 ? [p[1] / 6, +(p[4] * 100).toFixed(1), i] : null).filter(Boolean);
+  const finalIndex = trace.length - 1;
+  const result = [[trace[finalIndex][1] / 6, trace[finalIndex][4] * 100, finalIndex]];
   const option = {
     animationDuration: 350, grid: { left: 44, right: 20, top: 35, bottom: 47 },
-    tooltip: { ...tooltipBase, trigger: "axis", axisPointer: { type: "cross", lineStyle: { color: "#7da9b7" } },
-      formatter: params => {
-        const entry = params.find(x => x.seriesName === "Calibrated logistic") || params[0];
+    tooltip: { ...tooltipBase, trigger: "item",
+      formatter: entry => {
         const point = trace[entry.data[2]];
-        return `<b>After ${overText(point[1])} overs · ${point[2]}/${point[3]}</b><br>${escapeHtml(point[6])} facing ${escapeHtml(point[7])}<br><span style="color:${C.teal}">●</span> Logistic ${pct(point[4])}<br><span style="color:${C.gold}">●</span> Boosted ${pct(point[5])}`;
+        const value = entry.seriesName === "Known result" ? `Known result: ${point[4] ? "chase won" : "chase lost"}` : `Chase forecast: ${pct(point[4])}`;
+        return `<b>After ${overText(point[1])} overs · ${point[2]}/${point[3]}</b><br>${escapeHtml(point[6])} facing ${escapeHtml(point[7])}<br>${value}`;
       } },
     xAxis: { type: "value", min: 0, max: state.match.overs, name: "Overs", nameLocation: "middle", nameGap: 28,
       nameTextStyle: { color: C.muted }, axisLabel: { ...axisLabel, formatter: v => v.toFixed(0) },
@@ -161,9 +165,9 @@ function renderReplay() {
       axisLine: { show: false }, splitLine },
     series: [
       { id: "logistic", name: "Calibrated logistic", type: "line", data: logistic, showSymbol: false, lineStyle: { width: 3, color: C.teal }, itemStyle: { color: C.teal }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: "#57d8c32f" }, { offset: 1, color: "#57d8c300" }]) } },
-      { id: "boosted", name: "Boosted model", type: "line", data: boosted, showSymbol: false, lineStyle: { width: 1.8, color: C.gold, type: "dashed" }, itemStyle: { color: C.gold } },
       { id: "wickets", name: "Wicket", type: "scatter", data: wickets, symbol: "diamond", symbolSize: 11, itemStyle: { color: C.red, borderColor: "#fff", borderWidth: 1 }, z: 5 },
       { id: "sixes", name: "Six or more", type: "scatter", data: sixes, symbolSize: 8, itemStyle: { color: C.gold }, z: 4 },
+      { id: "result", name: "Known result", type: "scatter", data: result, symbol: "circle", symbolSize: 14, itemStyle: { color: C.gold, borderColor: C.text, borderWidth: 2 }, z: 6 },
     ],
   };
   const instance = chart("replayChart");
@@ -176,6 +180,7 @@ function selectMoment(index) {
   if (!state.trace.length) return;
   state.selected = Math.max(0, Math.min(index, state.trace.length - 1));
   const p = state.trace[state.selected];
+  const isFinal = state.selected === state.trace.length - 1;
   const previous = state.selected ? state.trace[state.selected - 1][4] : p[4];
   const shift = p[4] - previous;
   const displayedShift = Math.abs(shift) < 0.0005 ? 0 : shift;
@@ -183,29 +188,23 @@ function selectMoment(index) {
   $("momentOver").textContent = `OVER ${overText(p[1])} · DELIVERY ${p[0]}`;
   $("momentScore").textContent = `${p[2]}/${p[3]}`;
   $("momentEvent").textContent = `${p[6]} vs ${p[7]} · ${p[8]} run${p[8] === 1 ? "" : "s"}${p[9] ? ` · ${p[9]}` : ""}`;
+  $("momentProbLabel").textContent = isFinal ? "Known result" : "Chase win probability";
   $("momentProbability").textContent = pct(p[4]);
   $("momentBarFill").style.width = pct(p[4]);
-  $("momentSwing").textContent = `${displayedShift > 0 ? "+" : ""}${(displayedShift * 100).toFixed(1)} pp`;
-  $("momentSwing").style.color = displayedShift >= 0 ? C.teal : C.red;
+  $("momentSwingLabel").textContent = isFinal ? "Model change" : "Change on this delivery";
+  $("momentSwing").textContent = isFinal ? "—" : `${displayedShift > 0 ? "+" : ""}${(displayedShift * 100).toFixed(1)} pp`;
+  $("momentSwing").style.color = isFinal ? C.muted : displayedShift >= 0 ? C.teal : C.red;
   renderScenario();
 }
 
 function calibratedProbability(features) {
   const model = state.scenarioModel;
   let z = model.intercept;
-  for (let i = 0; i < features.length; i++) {
-    z += model.coefficients[i] * (features[i] - model.mean[i]) / model.scale[i];
+  for (let i = 0; i < model.feature_indices.length; i++) {
+    z += model.coefficients[i] * (features[model.feature_indices[i]] - model.mean[i]) / model.scale[i];
   }
-  const raw = 1 / (1 + Math.exp(-Math.max(-50, Math.min(50, z))));
-  const xs = model.thresholds, ys = model.calibrated_values;
-  if (raw <= xs[0]) return ys[0];
-  for (let i = 1; i < xs.length; i++) {
-    if (raw <= xs[i]) {
-      const fraction = (raw - xs[i - 1]) / (xs[i] - xs[i - 1]);
-      return ys[i - 1] + fraction * (ys[i] - ys[i - 1]);
-    }
-  }
-  return ys[ys.length - 1];
+  const calibrated = model.calibration_slope * z + model.calibration_intercept;
+  return 1 / (1 + Math.exp(-Math.max(-50, Math.min(50, calibrated))));
 }
 
 function nextBallProbability(nextRuns, nextWicket) {
@@ -236,6 +235,7 @@ function renderScenario() {
     $("scenarioEnd").textContent = state.trace.length
       ? "Match complete. Select an earlier delivery to explore a next-ball scenario."
       : "Choose a match to explore next-ball scenarios.";
+    $("scenarioCurrentLabel").textContent = state.trace.length ? "Known result" : "Current forecast";
     $("scenarioCurrent").textContent = state.trace.length ? pct(state.trace[state.selected][4]) : "—";
     $("scenarioChoice").textContent = "Next ball";
     $("scenarioProjected").textContent = "—";
@@ -244,6 +244,7 @@ function renderScenario() {
     return;
   }
   $("scenarioEnd").hidden = true;
+  $("scenarioCurrentLabel").textContent = "Current forecast";
   const mobile = window.innerWidth < 600;
   const runOptions = [0, 1, 2, 3, 4, 6];
   const current = state.trace[state.selected][4];
@@ -433,8 +434,25 @@ function renderAudit() {
     yAxis: { type: "category", data: features.map(f => f.feature.replaceAll("_", " ")), axisLabel: { color: C.muted, fontSize: 10 }, axisLine: { show: false } },
     series: [{ type: "bar", data: features.map(f => f.brier_increase), barWidth: 15, itemStyle: { color: C.gold, borderRadius: [0, 4, 4, 0] } }]
   });
-  const logistic = report.chase.calibrated_logistic, boosted = report.chase.gradient_boosting_calibrated;
-  $("modelScoreboard").innerHTML = `<div class="score-row"><span>Calibrated logistic<small>Replay model · Brier</small></span><strong>${logistic.brier.toFixed(4)}</strong></div><div class="score-row loss"><span>Calibrated boosted trees<small>2024 validation winner · Brier</small></span><strong>${boosted.brier.toFixed(4)}</strong></div><div class="score-row"><span>Logistic discrimination<small>Area under ROC curve</small></span><strong>${logistic.auc.toFixed(3)}</strong></div><div class="score-row"><span>Match-weighted Brier<small>Each match carries equal weight</small></span><strong>${logistic.match_weighted_brier.toFixed(4)}</strong></div>`;
+  const swings = report.chase.replay_transitions, oldSwings = report.chase.previous_replay_transitions;
+  const swingKeys = ["middle_four", "middle_dot", "early_four", "early_dot"];
+  chart("swingAuditChart").setOption({
+    grid: { left: 100, right: 24, top: 44, bottom: 30 },
+    tooltip: { ...tooltipBase, trigger: "axis", axisPointer: { type: "shadow" },
+      formatter: entries => `${entries[0].name}<br>${entries.map(item => `${item.marker} ${item.seriesName}: ${item.value.toFixed(2)} pp`).join("<br>")}` },
+    legend: { data: ["Previous", "Repaired"], top: 0, textStyle: { color: C.muted, fontSize: 11 } },
+    xAxis: { type: "value", name: "Percentage points", nameLocation: "middle", nameGap: 26,
+      nameTextStyle: { color: C.muted }, axisLabel, splitLine },
+    yAxis: { type: "category", data: ["Middle · four", "Middle · dot", "Early · four", "Early · dot"],
+      axisLabel: { color: C.muted, fontSize: 11 }, axisLine: { show: false } },
+    series: [
+      { name: "Previous", type: "bar", data: swingKeys.map(key => oldSwings[key].p99_abs_pp), itemStyle: { color: C.red } },
+      { name: "Repaired", type: "bar", data: swingKeys.map(key => swings[key].p99_abs_pp), itemStyle: { color: C.teal } },
+    ],
+  });
+  const logistic = report.chase.calibrated_logistic, previous = report.chase.previous_replay_model,
+    boosted = report.chase.gradient_boosting_calibrated;
+  $("modelScoreboard").innerHTML = `<div class="score-row"><span>Repaired replay model<small>Continuous calibration · Brier</small></span><strong>${logistic.brier.toFixed(4)}</strong></div><div class="score-row loss"><span>Previous replay model<small>Stepped calibration · Brier</small></span><strong>${previous.brier.toFixed(4)}</strong></div><div class="score-row loss"><span>Boosted trees<small>Exploratory comparison · Brier</small></span><strong>${boosted.brier.toFixed(4)}</strong></div><div class="score-row"><span>Replay discrimination<small>Area under ROC curve</small></span><strong>${logistic.auc.toFixed(3)}</strong></div><div class="score-row"><span>Match-weighted Brier<small>Each match carries equal weight</small></span><strong>${logistic.match_weighted_brier.toFixed(4)}</strong></div>`;
   const ball = report.next_ball;
   $("nextBallScoreboard").innerHTML = `<div class="score-row"><span>Runs model MSE<small>Constant-mean baseline ${ball.runs_constant_baseline_mse.toFixed(3)}</small></span><strong>${ball.runs_mse.toFixed(3)}</strong></div><div class="score-row loss"><span>Runs model MAE<small>Constant-mean baseline ${ball.runs_constant_baseline_mae.toFixed(3)}</small></span><strong>${ball.runs_mae.toFixed(3)}</strong></div><div class="score-row"><span>Wicket risk Brier<small>Constant-rate baseline ${ball.wicket_constant_baseline_brier.toFixed(4)}</small></span><strong>${ball.wicket_brier.toFixed(4)}</strong></div><div class="score-row"><span>Held-period legal balls<small>2025–26</small></span><strong>${fmt(ball.test_legal_balls)}</strong></div>`;
 }

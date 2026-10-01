@@ -31,6 +31,8 @@ FEATURES = [
     "runs_required", "current_run_rate", "required_run_rate",
     "last_12_delivery_runs", "last_12_delivery_wickets",
 ]
+CHASE_FEATURE_INDICES = [1, 3, 5, 6, 8]
+CHASE_FEATURES = [FEATURES[index] for index in CHASE_FEATURE_INDICES]
 SEED = 42
 
 
@@ -148,6 +150,45 @@ def match_bootstrap_brier(y, p, match_ids, repeats=300):
     return [round(float(v), 5) for v in np.quantile(sampled, [0.025, 0.975])]
 
 
+def paired_brier_delta(y, candidate, previous, match_ids, repeats=1000):
+    """Match-level interval for candidate Brier minus previous Brier."""
+    grouped = defaultdict(list)
+    for match_id, new, old, outcome in zip(match_ids, candidate, previous, y):
+        grouped[int(match_id)].append(float((new - outcome) ** 2 - (old - outcome) ** 2))
+    means = np.asarray([np.mean(rows) for rows in grouped.values()])
+    rng = np.random.default_rng(SEED)
+    sampled = means[rng.integers(0, len(means), size=(repeats, len(means)))].mean(axis=1)
+    return [round(float(v), 5) for v in np.quantile(sampled, [0.025, 0.975])]
+
+
+def transition_audit(features, probabilities, ids, years):
+    """Measure visible changes in full-length chases without terminal results."""
+    same_match = ids[1:] == ids[:-1]
+    period = years[1:] >= 2025
+    full_length = (features[1:, 4] + features[1:, 5] == 120)
+    legal_ball = features[1:, 4] - features[:-1, 4] == 1
+    no_wicket = features[1:, 3] == features[:-1, 3]
+    runs = features[1:, 2] - features[:-1, 2]
+    delta = 100 * (probabilities[1:] - probabilities[:-1])
+    result = {}
+    for phase, phase_mask in [
+        ("early", features[:-1, 4] < 36),
+        ("middle", (features[:-1, 4] >= 36) & (features[:-1, 4] < 90)),
+    ]:
+        for event, run_count in [("dot", 0), ("four", 4)]:
+            selected = same_match & period & full_length & legal_ball & no_wicket & (runs == run_count) & phase_mask
+            changes = delta[selected]
+            wrong_direction = changes > 0.5 if event == "dot" else changes < -0.5
+            result[f"{phase}_{event}"] = {
+                "count": int(len(changes)),
+                "p95_abs_pp": round(float(np.quantile(abs(changes), .95)), 2),
+                "p99_abs_pp": round(float(np.quantile(abs(changes), .99)), 2),
+                "max_abs_pp": round(float(max(abs(changes))), 2),
+                "wrong_direction_over_half_point": int(wrong_direction.sum()),
+            }
+    return result
+
+
 def main():
     start = time.time()
     build = ROOT / "build"
@@ -161,13 +202,29 @@ def main():
     assert set(ids[val]).isdisjoint(set(ids[test]))
     assert train.sum() > 100_000 and val.sum() > 5_000 and test.sum() > 10_000
 
+    # Remove redundant score/clock and rolling-form inputs. Their coefficients let
+    # a dot increase chase odds when an old wicket left the 12-delivery window.
+    chase_state = chase_x[:, CHASE_FEATURE_INDICES]
     baseline = make_pipeline(StandardScaler(), LogisticRegression(C=0.2, max_iter=700, random_state=SEED))
-    baseline.fit(chase_x[train], chase_y[train])
-    baseline_val = baseline.predict_proba(chase_x[val])[:, 1]
-    baseline_test = baseline.predict_proba(chase_x[test])[:, 1]
-    baseline_calibrator = IsotonicRegression(out_of_bounds="clip", y_min=0.001, y_max=0.999)
-    baseline_calibrator.fit(baseline_val, chase_y[val])
-    baseline_cal_test = baseline_calibrator.predict(baseline_test)
+    baseline.fit(chase_state[train], chase_y[train])
+    effective_coefficients = (baseline.named_steps["logisticregression"].coef_[0] /
+                              baseline.named_steps["standardscaler"].scale_)
+    assert np.array_equal(np.sign(effective_coefficients), [1, -1, 1, -1, -1])
+    baseline_val = baseline.predict_proba(chase_state[val])[:, 1]
+    baseline_test = baseline.predict_proba(chase_state[test])[:, 1]
+    # Platt scaling is continuous. Isotonic calibration produced 12+ point
+    # steps from almost identical raw scores and broke the replay chart.
+    baseline_calibrator = LogisticRegression(C=1e6, max_iter=1000, random_state=SEED)
+    baseline_calibrator.fit(baseline.decision_function(chase_state[val]).reshape(-1, 1), chase_y[val])
+    assert baseline_calibrator.coef_[0, 0] > 0
+    baseline_cal_test = baseline_calibrator.predict_proba(
+        baseline.decision_function(chase_state[test]).reshape(-1, 1))[:, 1]
+
+    legacy = make_pipeline(StandardScaler(), LogisticRegression(C=0.2, max_iter=700, random_state=SEED))
+    legacy.fit(chase_x[train], chase_y[train])
+    legacy_calibrator = IsotonicRegression(out_of_bounds="clip", y_min=0.001, y_max=0.999)
+    legacy_calibrator.fit(legacy.predict_proba(chase_x[val])[:, 1], chase_y[val])
+    legacy_test = legacy_calibrator.predict(legacy.predict_proba(chase_x[test])[:, 1])
 
     candidates = []
     for leaves, iterations in [(15, 120), (31, 180)]:
@@ -183,7 +240,9 @@ def main():
     calibrator.fit(model.predict_proba(chase_x[val])[:, 1], chase_y[val])
     raw_test = model.predict_proba(chase_x[test])[:, 1]
     calibrated_test = calibrator.predict(raw_test)
-    all_probability = baseline_calibrator.predict(baseline.predict_proba(chase_x)[:, 1])
+    all_probability = baseline_calibrator.predict_proba(
+        baseline.decision_function(chase_state).reshape(-1, 1))[:, 1]
+    legacy_all_probability = legacy_calibrator.predict(legacy.predict_proba(chase_x)[:, 1])
     all_boosted_probability = calibrator.predict(model.predict_proba(chase_x)[:, 1])
     np.savez_compressed(build / "chase_predictions.npz",
                         match_id=ids, delivery_no=np.array([x[2] for x in chase_meta], dtype=np.int16),
@@ -191,7 +250,9 @@ def main():
                         boosted_probability=all_boosted_probability.astype(np.float32))
     joblib.dump({"baseline": baseline, "baseline_calibrator": baseline_calibrator,
                  "boosted": model, "boosted_calibrator": calibrator,
-                 "features": FEATURES}, build / "chase_model.joblib")
+                 "features": FEATURES, "chase_feature_indices": CHASE_FEATURE_INDICES,
+                 "chase_features": CHASE_FEATURES, "calibration_method": "platt"},
+                build / "chase_model.joblib")
 
     permutation = permutation_importance(
         model, chase_x[val][:4000], chase_y[val][:4000],
@@ -231,8 +292,13 @@ def main():
     report = {
         "source_archive_sha256": json.loads((ROOT / "data_manifest.json").read_text())["archive_sha256"],
         "feature_names": FEATURES,
+        "replay_feature_names": CHASE_FEATURES,
+        "replay_effective_coefficients": {
+            name: round(float(value), 6) for name, value in zip(CHASE_FEATURES, effective_coefficients)
+        },
         "training": {"train_years": "2008-2023", "validation_year": 2024,
                      "test_years": [2025, 2026], "random_seed": SEED,
+                     "replay_calibration": "Platt logistic on 2024 raw decision scores",
                      "selected_max_leaf_nodes": leaves, "selected_iterations": iterations,
                      "validation_logistic_raw_brier": round(float(brier_score_loss(chase_y[val], baseline_val)), 5),
                      "validation_raw_brier": round(val_brier, 5),
@@ -241,9 +307,22 @@ def main():
         "chase": {
             "baseline_logistic": score_classifier(chase_y[test], baseline_test, ids[test]),
             "calibrated_logistic": score_classifier(chase_y[test], baseline_cal_test, ids[test]),
+            "replay_2024_in_sample_calibration_brier": round(float(brier_score_loss(
+                chase_y[val], baseline_calibrator.predict_proba(
+                    baseline.decision_function(chase_state[val]).reshape(-1, 1))[:, 1])), 5),
+            "previous_replay_model": score_classifier(chase_y[test], legacy_test, ids[test]),
+            "previous_isotonic_output_levels": int(len(np.unique(legacy_calibrator.y_thresholds_))),
+            "previous_isotonic_largest_step_pp": round(float(
+                100 * np.max(np.diff(legacy_calibrator.y_thresholds_))), 2),
+            "previous_2024_in_sample_calibration_brier": round(float(brier_score_loss(
+                chase_y[val], legacy_calibrator.predict(legacy.predict_proba(chase_x[val])[:, 1]))), 5),
             "gradient_boosting_raw": score_classifier(chase_y[test], raw_test, ids[test]),
             "gradient_boosting_calibrated": score_classifier(chase_y[test], calibrated_test, ids[test]),
             "brier_match_bootstrap_95pct": match_bootstrap_brier(chase_y[test], baseline_cal_test, ids[test]),
+            "brier_delta_vs_previous_match_bootstrap_95pct": paired_brier_delta(
+                chase_y[test], baseline_cal_test, legacy_test, ids[test]),
+            "replay_transitions": transition_audit(chase_x, all_probability, ids, years),
+            "previous_replay_transitions": transition_audit(chase_x, legacy_all_probability, ids, years),
             "reliability": reliability(chase_y[test], baseline_cal_test),
             "feature_importance": importance,
             "by_season": {}, "by_stage": {},
@@ -265,11 +344,11 @@ def main():
         mask = test & (years == season)
         report["chase"]["by_season"][str(season)] = score_classifier(
             chase_y[mask], all_probability[mask], ids[mask])
-    balls_left = chase_x[:, FEATURES.index("balls_left")]
+    legal_balls_used = chase_x[:, FEATURES.index("legal_balls_used")]
     for name, stage_mask in [
-        ("early_overs_1_6", balls_left > 84),
-        ("middle_overs_7_15", (balls_left <= 84) & (balls_left > 30)),
-        ("death_overs_16_20", balls_left <= 30),
+        ("early_overs_1_6", legal_balls_used < 36),
+        ("middle_overs_7_15", (legal_balls_used >= 36) & (legal_balls_used < 90)),
+        ("death_overs_16_20", legal_balls_used >= 90),
     ]:
         mask = test & stage_mask
         report["chase"]["by_stage"][name] = score_classifier(

@@ -77,15 +77,39 @@ class PipelineTests(unittest.TestCase):
     def test_published_replays_and_audit(self):
         matches = json.loads((ROOT / "docs" / "data" / "matches.json").read_text())
         eligible = [m for m in matches if m["eligible"]]
+        match_lookup = {str(m["id"]): m for m in eligible}
         published = 0
+        checked = {"early_dot": 0, "early_four": 0, "middle_dot": 0, "middle_four": 0}
         for year in range(2008, 2027):
             replays = json.loads((ROOT / "docs" / "data" / "replays" / f"{year}.json").read_text())
             published += len(replays)
-            for points in replays.values():
+            for mid, points in replays.items():
                 self.assertGreater(len(points), 1)
                 self.assertIn(points[-1][4], (0, 1))
+                if year < 2025 or match_lookup[mid]["overs"] != 20:
+                    continue
+                for previous, current in zip(points[:-2], points[1:-1]):
+                    if current[1] - previous[1] != 1 or current[3] != previous[3]:
+                        continue
+                    phase = "early" if previous[1] < 36 else "middle" if previous[1] < 90 else None
+                    runs = current[2] - previous[2]
+                    event = "dot" if runs == 0 else "four" if runs == 4 else None
+                    if not phase or not event:
+                        continue
+                    key = f"{phase}_{event}"
+                    checked[key] += 1
+                    delta = 100 * (current[4] - previous[4])
+                    self.assertGreaterEqual(delta, -0.51 if event == "four" else -9)
+                    self.assertLessEqual(delta, 0.51 if event == "dot" else 9)
+                    if phase == "early":
+                        self.assertLessEqual(abs(delta), 3 if event == "dot" else 7)
+                    else:
+                        self.assertLessEqual(abs(delta), 6 if event == "dot" else 9)
         self.assertEqual(published, len(eligible))
         self.assertEqual(sum(m["season"] == 2026 for m in eligible), 71)
+        self.assertTrue(all(count > 500 for count in checked.values()))
+        self.assertEqual(checked, {key: value["count"] for key, value in
+                                   self.report["chase"]["replay_transitions"].items()})
         self.assertEqual(self.report["source_archive_sha256"], self.manifest["archive_sha256"])
 
     def test_batter_balls_faced_include_no_balls(self):

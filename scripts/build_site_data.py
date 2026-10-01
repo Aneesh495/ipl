@@ -40,21 +40,24 @@ def build():
     scaler = baseline.named_steps["standardscaler"]
     classifier = baseline.named_steps["logisticregression"]
     calibrator = chase_artifact["baseline_calibrator"]
+    feature_indices = chase_artifact["chase_feature_indices"]
     reference_states = np.asarray([
         state_features(2, 180, 72, 2, 60, 120, [(1, 0)] * 12),
         state_features(2, 180, 156, 6, 108, 120, [(2, 0)] * 12),
         state_features(2, 190, 22, 1, 18, 120, [(0, 0)] * 12),
     ], dtype=np.float32)
-    reference_probabilities = calibrator.predict(
-        baseline.predict_proba(reference_states)[:, 1])
+    reference_probabilities = calibrator.predict_proba(
+        baseline.decision_function(reference_states[:, feature_indices]).reshape(-1, 1))[:, 1]
     scenario_model = {
         "features": chase_artifact["features"],
+        "replay_features": chase_artifact["chase_features"],
+        "feature_indices": feature_indices,
         "mean": scaler.mean_.tolist(),
         "scale": scaler.scale_.tolist(),
         "coefficients": classifier.coef_[0].tolist(),
         "intercept": float(classifier.intercept_[0]),
-        "thresholds": calibrator.X_thresholds_.tolist(),
-        "calibrated_values": calibrator.y_thresholds_.tolist(),
+        "calibration_slope": float(calibrator.coef_[0, 0]),
+        "calibration_intercept": float(calibrator.intercept_[0]),
         "references": [
             {"features": row.tolist(), "probability": float(probability)}
             for row, probability in zip(reference_states, reference_probabilities)
@@ -259,7 +262,8 @@ def build():
             2, match["target"], current[2] + next_runs, current[3] + next_wicket,
             current[1] + 1, match["target_overs"] * 6, recent,
         )], dtype=np.float32)
-        probability = float(calibrator.predict(baseline.predict_proba(features)[:, 1])[0])
+        probability = float(calibrator.predict_proba(
+            baseline.decision_function(features[:, feature_indices]).reshape(-1, 1))[0, 1])
         scenario_references.append({
             "match_id": match_id, "season": match["season"], "selected_index": selected_index,
             "next_runs": next_runs, "next_wicket": next_wicket, "probability": probability,

@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="en" data-build="0f54f55a8c9ed24b">
+<html lang="en" data-build="9a7107a58e02311e">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#07111d">
   <meta name="description" content="Explore every IPL season, ball by ball, with honest machine learning and interactive match replays.">
   <title>IPL Decision Lab | Every ball changes the game</title>
-  <link rel="stylesheet" href="./styles.css?v=0f54f55a8c9ed24b">
-  <script src="./vendor/echarts.min.js?v=0f54f55a8c9ed24b" defer></script>
-  <script src="./app.js?v=0f54f55a8c9ed24b" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=9a7107a58e02311e">
+  <script src="./vendor/echarts.min.js?v=9a7107a58e02311e" defer></script>
+  <script src="./app.js?v=9a7107a58e02311e" defer></script>
 </head>
 <body>
   <div class="site-shell">
@@ -43,7 +43,7 @@
       </section>
 
       <section id="lab" class="section">
-        <div class="section-head"><div><span class="section-no">01 / MATCH LAB</span><h2>Replay the pressure.</h2><p>Follow a chase ball by ball. Two models track its changing win probability. Select a delivery to inspect the state behind the line.</p></div><span class="section-ornament">↗</span></div>
+        <div class="section-head"><div><span class="section-no">01 / MATCH LAB</span><h2>Replay the pressure.</h2><p>Follow a chase ball by ball. The calibrated chase model tracks its changing win probability. Select a delivery to inspect the state behind the line.</p></div><span class="section-ornament">↗</span></div>
         <div class="filter-bar">
           <label>Season<select id="seasonSelect" aria-label="Select season"></select></label>
           <label>Team<select id="teamSelect" aria-label="Filter by team"><option value="all">All teams</option></select></label>
@@ -55,8 +55,8 @@
           <div class="match-result"><span>CHASE RESULT</span><strong id="matchResult">—</strong><small id="matchTarget">—</small></div>
         </div>
         <div class="lab-grid">
-          <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">WIN PROBABILITY</span><h3>How the chase moved</h3></div><div class="legend"><span><i class="legend-teal"></i> Calibrated logistic</span><span><i class="legend-gold"></i> Boosted model</span></div></div><div id="replayChart" class="chart replay-chart" role="img" aria-label="Ball by ball win probability chart"></div><div class="chart-caption">After each delivery; final point is the known result · replay model chosen after 2025–26 evaluation · historical training games are in sample</div></div>
-          <aside class="card moment-card"><span class="card-kicker">AT THIS BALL</span><div class="moment-over" id="momentOver">—</div><div class="moment-score" id="momentScore">—</div><p id="momentEvent">Select a point on the replay.</p><div class="moment-prob"><span>Chase win probability</span><strong id="momentProbability">—</strong></div><div class="moment-bar"><div id="momentBarFill"></div></div><div class="moment-shift"><span>Change on this delivery</span><strong id="momentSwing">—</strong></div><input id="ballSlider" type="range" min="0" max="0" value="0" aria-label="Select delivery"><div class="moment-foot">Slide through the innings or click the chart.</div></aside>
+          <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">WIN PROBABILITY</span><h3>How the chase moved</h3></div><div class="legend"><span><i class="legend-teal"></i> Calibrated logistic</span><span><i class="legend-gold"></i> Known result</span></div></div><div id="replayChart" class="chart replay-chart" role="img" aria-label="Ball by ball win probability chart"></div><div class="chart-caption">Forecast after each nonfinal delivery; gold marker is the known result · late balls in shortened chases can still move sharply · historical training games are in sample</div></div>
+          <aside class="card moment-card"><span class="card-kicker">AT THIS BALL</span><div class="moment-over" id="momentOver">—</div><div class="moment-score" id="momentScore">—</div><p id="momentEvent">Select a point on the replay.</p><div class="moment-prob"><span id="momentProbLabel">Chase win probability</span><strong id="momentProbability">—</strong></div><div class="moment-bar"><div id="momentBarFill"></div></div><div class="moment-shift"><span id="momentSwingLabel">Change on this delivery</span><strong id="momentSwing">—</strong></div><input id="ballSlider" type="range" min="0" max="0" value="0" aria-label="Select delivery"><div class="moment-foot">Slide through the innings or click the chart.</div></aside>
         </div>
         <div class="card turning-card"><div class="card-top"><div><span class="card-kicker">INFLECTION POINTS</span><h3>Biggest observed swings</h3></div><span class="muted">Probability change between consecutive recorded deliveries</span></div><div id="turningPoints" class="turning-list"></div></div>
         <div class="card scenario-card">
@@ -68,7 +68,7 @@
               <div id="scenarioEnd" class="scenario-end" hidden>Select an earlier delivery to explore a next-ball scenario.</div>
             </div>
             <div class="scenario-readout">
-              <div><span>Current forecast</span><strong id="scenarioCurrent">—</strong></div>
+              <div><span id="scenarioCurrentLabel">Current forecast</span><strong id="scenarioCurrent">—</strong></div>
               <div><span id="scenarioChoice">Next ball</span><strong id="scenarioProjected">—</strong></div>
               <div><span>Change in win chance</span><strong id="scenarioDelta">—</strong></div>
               <p id="scenarioNote">Select a nonfinal delivery in the replay.</p>
@@ -95,11 +95,12 @@
       </section>
 
       <section id="audit" class="section audit-section">
-        <div class="section-head"><div><span class="section-no">04 / MODEL AUDIT</span><h2>Show the misses.</h2><p>Train on 2008–23, calibrate on 2024, and examine 2025–26. The boosted chase model wins on validation but loses across the later seasons.</p></div><span class="section-ornament">↗</span></div>
+        <div class="section-head"><div><span class="section-no">04 / MODEL AUDIT</span><h2>Show the misses.</h2><p>Train on 2008–23, calibrate on 2024, and examine 2025–26. A continuous calibration replaces the replay's jumpy isotonic fit. Boosted trees remain in the audit because their later-season score is worse.</p></div><span class="section-ornament">↗</span></div>
         <div class="audit-banner"><div><span class="banner-icon">!</span></div><p><strong>Read the score honestly.</strong> The replay model was chosen after inspecting aggregate 2025–26 results. Its reported score is diagnostic, not a pristine prospective test. No model has access to the next delivery or final score when it makes a state prediction.</p></div>
         <div class="audit-grid">
           <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">CALIBRATION</span><h3>Prediction versus reality</h3></div></div><div id="reliabilityChart" class="chart audit-chart" role="img" aria-label="Reliability plot"></div><div class="chart-caption">Each point groups held-period chase states by forecast probability.</div></div>
           <div class="card model-card"><span class="card-kicker">2025–26 DIAGNOSTIC PERIOD</span><h3>Simple won.</h3><div id="modelScoreboard"></div><div class="model-note">Brier score measures squared probability error. Lower is better. Each delivery state is scored; match-weighted Brier is in the research notes.</div></div>
+          <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">BALL-BY-BALL REPAIR</span><h3>Where the jumps went</h3></div></div><div id="swingAuditChart" class="chart audit-chart" role="img" aria-label="Previous and repaired 99th percentile ball swing comparison"></div><div class="chart-caption">99th percentile absolute change in percentage points on legal dots and fours without wickets, full 20-over chases in 2025–26. Early: overs 1–6. Middle: overs 7–15.</div></div>
           <div class="card chart-card"><div class="card-top"><div><span class="card-kicker">TREE MODEL</span><h3>What it paid attention to</h3></div></div><div id="importanceChart" class="chart audit-chart" role="img" aria-label="Permutation importance chart"></div><div class="chart-caption">Increase in 2024 validation Brier when one feature is shuffled. This explains the boosted model, not the logistic replay model.</div></div>
           <div class="card model-card"><span class="card-kicker">SECOND MODEL · NEXT BALL</span><h3>Runs &amp; wicket risk.</h3><div id="nextBallScoreboard"></div><p class="model-note">The run regressor beats a constant mean on squared error, but loses on absolute error. The wicket classifier narrowly beats a constant-rate baseline. Use player residuals as exploration, not scouting verdicts.</p></div>
         </div>

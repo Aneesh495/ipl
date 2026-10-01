@@ -70,12 +70,31 @@ vm.runInContext(source + '\nglobalThis.testApi = { state, loadMatch, updateMatch
   assert.ok(state.trace[state.selected][4] < 0.9, 'Initial match starts at an informative moment');
   assert.match(document.getElementById('matchTitle').textContent, /vs/);
   assert.equal(document.getElementById('errorBanner').hidden, true);
-  for (const id of ['replayChart', 'scenarioChart', 'eraChart', 'phaseChart', 'teamChart', 'playerChart', 'reliabilityChart', 'importanceChart']) {
+  for (const id of ['replayChart', 'scenarioChart', 'eraChart', 'phaseChart', 'teamChart', 'playerChart', 'reliabilityChart', 'importanceChart', 'swingAuditChart']) {
     assert.ok(state.charts[id]?.option?.series?.length, `${id} has a series`);
   }
   assert.equal(state.charts.scenarioChart.option.series[0].data.length, 12);
+  const scenarioCells = state.charts.scenarioChart.option.series[0].data;
+  for (const wicket of [0, 1]) {
+    const row = scenarioCells.filter(cell => cell.wicket === wicket);
+    for (let i = 1; i < row.length; i++) {
+      assert.ok(row[i].probability >= row[i - 1].probability - 1e-12,
+        'More runs cannot lower the forecast for a fixed wicket outcome');
+    }
+  }
+  for (let i = 0; i < 6; i++) {
+    assert.ok(scenarioCells[i + 6].probability <= scenarioCells[i].probability + 1e-12,
+      'A wicket cannot improve the forecast for a fixed run outcome');
+  }
   assert.equal(state.charts.replayChart.option.tooltip.confine, true);
+  assert.equal(state.charts.replayChart.option.series.filter(series => series.type === 'line').length, 1);
+  assert.equal(state.charts.replayChart.option.series[0].data.length, state.trace.length - 1);
+  assert.equal(state.charts.replayChart.option.series.at(-1).name, 'Known result');
+  assert.equal(state.charts.replayChart.option.series.at(-1).data[0][2], state.trace.length - 1);
   assert.equal(state.charts.importanceChart.option.xAxis.splitNumber, 2);
+  assert.equal(state.charts.swingAuditChart.option.series[0].data.length, 4);
+  assert.equal(state.scenarioModel.feature_indices.join(','), '1,3,5,6,8');
+  assert.ok(state.scenarioModel.calibration_slope > 0);
   for (const reference of state.scenarioModel.references) {
     assert.ok(Math.abs(calibratedProbability(reference.features) - reference.probability) < 1e-6);
   }
@@ -87,8 +106,12 @@ vm.runInContext(source + '\nglobalThis.testApi = { state, loadMatch, updateMatch
   selectMoment(state.trace.length - 1);
   assert.equal(state.charts.scenarioChart.option, null);
   assert.equal(document.getElementById('scenarioEnd').hidden, false);
+  assert.equal(document.getElementById('momentProbLabel').textContent, 'Known result');
+  assert.equal(document.getElementById('momentSwing').textContent, '—');
+  assert.equal(document.getElementById('scenarioCurrentLabel').textContent, 'Known result');
   selectMoment(0);
   assert.equal(document.getElementById('scenarioEnd').hidden, true);
+  assert.equal(document.getElementById('momentProbLabel').textContent, 'Chase win probability');
   context.window.innerWidth = 375;
   renderScenario();
   assert.equal(state.charts.scenarioChart.option.xAxis.data.length, 2);
@@ -104,9 +127,12 @@ vm.runInContext(source + '\nglobalThis.testApi = { state, loadMatch, updateMatch
       assert.equal(state.charts.replayChart.option.xAxis.max, 11);
     }
   }
-  assert.ok(state.charts.replayChart.option.tooltip.formatter([
+  assert.ok(state.charts.replayChart.option.tooltip.formatter(
     { seriesName: 'Calibrated logistic', data: state.charts.replayChart.option.series[0].data[0] }
-  ]).includes('Logistic'));
+  ).includes('Chase forecast'));
+  assert.ok(state.charts.replayChart.option.tooltip.formatter(
+    { seriesName: 'Known result', data: state.charts.replayChart.option.series.at(-1).data[0] }
+  ).includes('Known result'));
   const oldMatch = state.matches.find(m => m.eligible && m.season === 2008);
   await loadMatch(oldMatch.id);
   assert.equal(state.match.season, 2008);
@@ -142,6 +168,7 @@ vm.runInContext(source + '\nglobalThis.testApi = { state, loadMatch, updateMatch
   await slowLoad;
   assert.equal(state.match.id, 1535465, 'Late response cannot replace a newer match');
   context.fetch = normalFetch;
+  assert.ok(document.getElementById('modelScoreboard').innerHTML.includes('0.1224'));
   assert.ok(document.getElementById('modelScoreboard').innerHTML.includes('0.1254'));
-  console.log('Static app smoke: 8 charts, 2026 and 2008 replays, checked scenario math, player toggle, phase metric, model audit passed.');
+  console.log('Static app smoke: 9 charts, 2026 and 2008 replays, checked scenario math, player toggle, phase metric, model audit passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
