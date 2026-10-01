@@ -16,6 +16,7 @@ class Element {
     this.events = {};
     this.hidden = true;
     this.classList = { toggle() {} };
+    this.setAttribute = (name, value) => { this[name] = value; };
   }
   set innerHTML(value) { this._html = value; }
   get innerHTML() { return this._html || ''; }

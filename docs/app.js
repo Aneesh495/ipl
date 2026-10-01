@@ -44,7 +44,10 @@ function setupMatchControls() {
   $("seasonSelect").addEventListener("change", updateMatchList);
   $("teamSelect").addEventListener("change", updateMatchList);
   $("matchSelect").addEventListener("change", () => loadMatch(Number($("matchSelect").value)));
-  $("ballSlider").addEventListener("input", event => selectMoment(Number(event.target.value)));
+  $("ballSlider").addEventListener("input", event => {
+    stopPlayback();
+    selectMoment(Number(event.target.value));
+  });
   $("playButton").addEventListener("click", togglePlayback);
   updateMatchList();
 }
@@ -67,6 +70,7 @@ function clearMatchView(title, description) {
   $("momentBarFill").style.width = "0%";
   $("momentSwing").textContent = "—";
   $("momentSwingLabel").textContent = "Change on this delivery";
+  $("ballSlider").disabled = true;
   $("ballSlider").max = 0;
   $("ballSlider").value = 0;
   $("playButton").disabled = true;
@@ -81,6 +85,7 @@ function updateMatchList() {
   const team = $("teamSelect").value;
   const choices = state.matches.filter(m => m.eligible && m.season === year && (team === "all" || m.team1 === team || m.team2 === team));
   $("matchSelect").innerHTML = choices.map(m => `<option value="${m.id}">${escapeHtml(m.date)} · ${escapeHtml(shortTeam(m.team1))} vs ${escapeHtml(shortTeam(m.team2))}${m.stage ? ` · ${escapeHtml(m.stage)}` : ""}</option>`).join("");
+  $("matchSelect").disabled = !choices.length;
   if (!choices.length) {
     state.loadToken++;
     clearMatchView("No standard chase in this filter", "Try another team or season.");
@@ -123,6 +128,7 @@ async function loadMatch(id) {
   $("matchSub").textContent = `${match.venue || "Venue unlisted"} · ${match.batting} chasing`;
   $("matchResult").textContent = match.winner ? `${shortTeam(match.winner)} won` : "No result";
   $("matchTarget").textContent = `Target ${match.target} · Chase ${match.chase_runs} · ${match.overs} overs`;
+  $("ballSlider").disabled = false;
   $("ballSlider").max = Math.max(0, state.trace.length - 1);
   $("playButton").disabled = false;
   renderReplay();
@@ -306,12 +312,17 @@ function renderTurningPoints() {
   $("turningPoints").querySelectorAll("button").forEach(button => button.addEventListener("click", () => selectMoment(Number(button.dataset.index))));
 }
 
-function stopPlayback() { if (state.timer) { clearInterval(state.timer); state.timer = null; } $("playButton").innerHTML = "▶ &nbsp;Play replay"; }
+function stopPlayback() {
+  if (state.timer) clearInterval(state.timer);
+  state.timer = null;
+  const button = $("playButton");
+  button.textContent = state.selected > 0 && state.selected < state.trace.length - 1 ? "▶ Resume replay" : "▶ Play replay";
+}
 function togglePlayback() {
   if (!state.trace.length) return;
   if (state.timer) return stopPlayback();
-  selectMoment(0);
-  $("playButton").textContent = "Ⅱ  Pause";
+  if (state.selected >= state.trace.length - 1) selectMoment(0);
+  $("playButton").textContent = "Ⅱ Pause replay";
   state.timer = setInterval(() => {
     if (state.selected >= state.trace.length - 1) return stopPlayback();
     selectMoment(state.selected + 1);
@@ -388,6 +399,8 @@ function setPlayerType(type) {
   state.playerType = type;
   $("battersTab").classList.toggle("active", type === "batters");
   $("bowlersTab").classList.toggle("active", type === "bowlers");
+  $("battersTab").setAttribute("aria-pressed", String(type === "batters"));
+  $("bowlersTab").setAttribute("aria-pressed", String(type === "bowlers"));
   renderPlayers();
 }
 function renderPlayers() {

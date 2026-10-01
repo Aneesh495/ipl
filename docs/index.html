@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="en" data-build="17304949006ba36c">
+<html lang="en" data-build="2edf5b050dbdf22f">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#07111d">
   <meta name="description" content="Explore every IPL season, ball by ball, with honest machine learning and interactive match replays.">
   <title>IPL Decision Lab | Every ball changes the game</title>
-  <link rel="stylesheet" href="./styles.css?v=17304949006ba36c">
-  <script src="./vendor/echarts.min.js?v=17304949006ba36c" defer></script>
-  <script src="./app.js?v=17304949006ba36c" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=2edf5b050dbdf22f">
+  <script src="./vendor/echarts.min.js?v=2edf5b050dbdf22f" defer></script>
+  <script src="./app.js?v=2edf5b050dbdf22f" defer></script>
 </head>
 <body>
   <div class="site-shell">
@@ -48,7 +48,7 @@
           <label>Season<select id="seasonSelect" aria-label="Select season"></select></label>
           <label>Team<select id="teamSelect" aria-label="Filter by team"><option value="all">All teams</option></select></label>
           <label class="match-filter">Match<select id="matchSelect" aria-label="Select match"></select></label>
-          <button id="playButton" class="button small" type="button" aria-label="Play match replay">▶ &nbsp;Play replay</button>
+          <button id="playButton" class="button small" type="button">▶ &nbsp;Play replay</button>
         </div>
         <div class="match-header card">
           <div><span class="card-kicker" id="matchDate">MATCH REPLAY</span><h3 id="matchTitle">Loading match...</h3><p id="matchSub">&nbsp;</p></div>
@@ -90,7 +90,7 @@
 
       <section id="players" class="section">
         <div class="section-head"><div><span class="section-no">03 / PLAYER LANDSCAPE</span><h2>Find the outliers.</h2><p>Career production and recent context-adjusted performance. The run model controls for match state, then shrinks small samples toward zero.</p></div><span class="section-ornament">↗</span></div>
-        <div class="filter-bar"><div class="segmented" role="group" aria-label="Player type"><button id="battersTab" class="active" type="button">Batters</button><button id="bowlersTab" type="button">Bowlers</button></div><label>Minimum balls<select id="minBalls"><option value="100">100</option><option value="300" selected>300</option><option value="600">600</option><option value="1000">1,000</option></select></label><span class="filter-note">Batters: balls faced · bowlers: legal balls · dot size = career volume</span></div>
+        <div class="filter-bar"><div class="segmented" role="group" aria-label="Player type"><button id="battersTab" class="active" aria-pressed="true" type="button">Batters</button><button id="bowlersTab" type="button" aria-pressed="false">Bowlers</button></div><label>Minimum balls<select id="minBalls"><option value="100">100</option><option value="300" selected>300</option><option value="600">600</option><option value="1000">1,000</option></select></label><span class="filter-note">Batters: balls faced · bowlers: legal balls · dot size = career volume</span></div>
         <div class="player-grid"><div class="card chart-card"><div class="card-top"><div><span class="card-kicker" id="playerKicker">BATTING FINGERPRINTS</span><h3 id="playerTitle">Power meets volume</h3></div></div><div id="playerChart" class="chart player-chart" role="img" aria-label="Player performance scatter chart"></div><div class="chart-caption" id="playerCaption">Each dot is one player meeting the selected minimum.</div></div><div class="card leaderboard-card"><span class="card-kicker">2025–26 MODEL RESIDUALS</span><h3 id="leaderboardTitle">Context lift</h3><p class="muted" id="leaderboardDescription">Observed batter runs above the next-ball model expectation per 100 legal balls, shrunk toward zero.</p><div id="leaderboard"></div><div class="caution">Association, not causal player value. Bowlers, venues, matchups, and selection still matter.</div></div></div>
       </section>
 
